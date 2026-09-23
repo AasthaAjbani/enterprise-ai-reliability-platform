@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# ---------------------------------------------------------
+# DATA
+# ---------------------------------------------------------
+
+# Ignore generated/temporary processed data
+data/processed/*
+
+# Ignore production data by default
+data/production/*
+
+# But keep the production dataset required by the demo/API
+!data/production/transactions_production.csv
+
+
+# ---------------------------------------------------------
+# MODEL ARTIFACTS
+# ---------------------------------------------------------
+
+# Ignore arbitrary model artifacts
+models/*.pkl
+models/*.joblib
+
+# Keep the trained models required by the deployed API
+!models/fraud_model.joblib
+!models/anomaly_detector.joblib
+!models/anomaly_scaler.joblib
+
+# baseline_metrics.json is not ignored and will be committed
+
+
+# ---------------------------------------------------------
+# TESTING
+# ---------------------------------------------------------
+
+.pytest_cache/
+
+
+# ---------------------------------------------------------
+# MLFLOW
+# ---------------------------------------------------------
+
+mlruns/
+mlflow.db
