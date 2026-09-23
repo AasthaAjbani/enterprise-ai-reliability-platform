@@ -11,6 +11,10 @@ import {
   useRef,
 } from "react";
 
+import type {
+  ComponentRef,
+} from "react";
+
 import * as THREE from "three";
 
 import gsap from "gsap";
@@ -56,7 +60,7 @@ function CoreObject() {
 
 
   const coreMaterialRef =
-    useRef<THREE.MeshPhysicalMaterial>(null);
+    useRef<ComponentRef<typeof MeshDistortMaterial>>(null);
 
 
   const wireMaterialRef =
