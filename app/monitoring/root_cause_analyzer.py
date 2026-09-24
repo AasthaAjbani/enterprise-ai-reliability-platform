@@ -59,29 +59,122 @@ ORIGINAL_FEATURES = [
 
 def get_feature_importance(pipeline):
 
+    # -----------------------------------------------------
+    # Get preprocessing step
+    # -----------------------------------------------------
+
+    if "preprocessor" not in pipeline.named_steps:
+
+        raise KeyError(
+            "Could not find 'preprocessor' step in pipeline. "
+            f"Available steps: "
+            f"{list(pipeline.named_steps.keys())}"
+        )
+
+
     preprocessor = pipeline.named_steps[
         "preprocessor"
     ]
 
-    model = pipeline.named_steps[
-        "model"
-    ]
 
+    # -----------------------------------------------------
+    # Support both model pipeline versions
+    #
+    # V1:
+    # preprocessor -> model
+    #
+    # V2 challenger:
+    # preprocessor -> classifier
+    # -----------------------------------------------------
+
+    if "model" in pipeline.named_steps:
+
+        model = pipeline.named_steps[
+            "model"
+        ]
+
+    elif "classifier" in pipeline.named_steps:
+
+        model = pipeline.named_steps[
+            "classifier"
+        ]
+
+    else:
+
+        raise KeyError(
+            "Could not find model estimator in pipeline. "
+            f"Available steps: "
+            f"{list(pipeline.named_steps.keys())}"
+        )
+
+
+    # -----------------------------------------------------
+    # Verify estimator supports feature importance
+    # -----------------------------------------------------
+
+    if not hasattr(
+        model,
+        "feature_importances_",
+    ):
+
+        raise AttributeError(
+            "The active model does not expose "
+            "'feature_importances_'. "
+            f"Model type: {type(model).__name__}"
+        )
+
+
+    # -----------------------------------------------------
+    # Get transformed feature names
+    # -----------------------------------------------------
 
     transformed_feature_names = (
         preprocessor.get_feature_names_out()
     )
+
+
+    # -----------------------------------------------------
+    # Get transformed feature importance
+    # -----------------------------------------------------
 
     transformed_importances = (
         model.feature_importances_
     )
 
 
+    # -----------------------------------------------------
+    # Safety check
+    # -----------------------------------------------------
+
+    if (
+        len(transformed_feature_names)
+        !=
+        len(transformed_importances)
+    ):
+
+        raise ValueError(
+            "Feature-name count does not match "
+            "model feature-importance count. "
+            f"Feature names: "
+            f"{len(transformed_feature_names)}, "
+            f"Importances: "
+            f"{len(transformed_importances)}"
+        )
+
+
+    # -----------------------------------------------------
+    # Initialize original-feature importance map
+    # -----------------------------------------------------
+
     importance_map = {
         feature: 0.0
         for feature in ORIGINAL_FEATURES
     }
 
+
+    # -----------------------------------------------------
+    # Map transformed features back to original features
+    # -----------------------------------------------------
 
     for transformed_name, importance in zip(
         transformed_feature_names,
@@ -91,11 +184,12 @@ def get_feature_importance(pipeline):
         matched_feature = None
 
 
-        # ---------------------------------------------
+        # -------------------------------------------------
         # Numerical features
+        #
         # Example:
         # numerical__transaction_amount
-        # ---------------------------------------------
+        # -------------------------------------------------
 
         for feature in ORIGINAL_FEATURES:
 
@@ -103,18 +197,24 @@ def get_feature_importance(pipeline):
                 f"numerical__{feature}"
             )
 
-            if transformed_name == numerical_name:
+
+            if (
+                transformed_name
+                ==
+                numerical_name
+            ):
 
                 matched_feature = feature
+
                 break
 
 
-        # ---------------------------------------------
+        # -------------------------------------------------
         # Categorical features
         #
         # Example:
         # categorical__payment_method_UPI
-        # ---------------------------------------------
+        # -------------------------------------------------
 
         if matched_feature is None:
 
@@ -124,26 +224,40 @@ def get_feature_importance(pipeline):
                     f"categorical__{feature}_"
                 )
 
+
                 if transformed_name.startswith(
                     categorical_prefix
                 ):
 
                     matched_feature = feature
+
                     break
 
+
+        # -------------------------------------------------
+        # Aggregate one-hot encoded feature importance
+        # back into the original feature
+        # -------------------------------------------------
 
         if matched_feature is not None:
 
             importance_map[
                 matched_feature
-            ] += float(importance)
+            ] += float(
+                importance
+            )
 
+
+    # -----------------------------------------------------
+    # Convert to DataFrame
+    # -----------------------------------------------------
 
     importance_df = pd.DataFrame(
         {
             "feature": list(
                 importance_map.keys()
             ),
+
             "model_importance": list(
                 importance_map.values()
             ),
@@ -174,7 +288,9 @@ def generate_root_cause_report(
         "model_importance"
     ] = report[
         "model_importance"
-    ].fillna(0)
+    ].fillna(
+        0
+    )
 
 
     # -----------------------------------------------------
@@ -183,17 +299,31 @@ def generate_root_cause_report(
     # Drift Score × Model Importance
     # -----------------------------------------------------
 
-    report["root_cause_score"] = (
-        report["score"]
+    report[
+        "root_cause_score"
+    ] = (
+        report[
+            "score"
+        ]
         *
-        report["model_importance"]
+        report[
+            "model_importance"
+        ]
     )
 
 
+    # -----------------------------------------------------
     # Convert to easier-to-read percentage style score
-    report["root_cause_score"] = (
-        report["root_cause_score"]
-        * 100
+    # -----------------------------------------------------
+
+    report[
+        "root_cause_score"
+    ] = (
+        report[
+            "root_cause_score"
+        ]
+        *
+        100
     )
 
 
@@ -204,32 +334,58 @@ def generate_root_cause_report(
     def assign_priority(row):
 
         if (
-            row["drift_level"] == "HIGH"
-            and row["model_importance"] >= 0.10
+            row[
+                "drift_level"
+            ]
+            ==
+            "HIGH"
+            and
+            row[
+                "model_importance"
+            ]
+            >=
+            0.10
         ):
+
             return "HIGH"
 
+
         elif (
-            row["drift_level"]
-            in ["HIGH", "MODERATE"]
-            and row["model_importance"] >= 0.05
+            row[
+                "drift_level"
+            ]
+            in [
+                "HIGH",
+                "MODERATE",
+            ]
+            and
+            row[
+                "model_importance"
+            ]
+            >=
+            0.05
         ):
+
             return "MEDIUM"
+
 
         return "LOW"
 
 
-    report["root_cause_priority"] = (
-        report.apply(
-            assign_priority,
-            axis=1,
-        )
+    report[
+        "root_cause_priority"
+    ] = report.apply(
+        assign_priority,
+        axis=1,
     )
 
 
     report = report.sort_values(
-        by="root_cause_score",
-        ascending=False,
+        by=
+            "root_cause_score",
+
+        ascending=
+            False,
     )
 
 
@@ -248,7 +404,8 @@ def generate_recommendation(
         root_cause_report[
             "root_cause_priority"
         ]
-        == "HIGH"
+        ==
+        "HIGH"
     ]
 
 
@@ -256,7 +413,9 @@ def generate_recommendation(
 
         top_features = high_priority[
             "feature"
-        ].head(3).tolist()
+        ].head(
+            3
+        ).tolist()
 
 
         feature_text = ", ".join(
@@ -278,7 +437,8 @@ def generate_recommendation(
         root_cause_report[
             "root_cause_priority"
         ]
-        == "MEDIUM"
+        ==
+        "MEDIUM"
     ]
 
 
@@ -308,18 +468,32 @@ def main():
         "\nLoading trained model..."
     )
 
+
     pipeline = joblib.load(
         MODEL_FILE
     )
 
 
     print(
-        "Loading datasets..."
+        "Pipeline steps:"
     )
+
+    print(
+        list(
+            pipeline.named_steps.keys()
+        )
+    )
+
+
+    print(
+        "\nLoading datasets..."
+    )
+
 
     reference_data = pd.read_csv(
         REFERENCE_DATA_FILE
     )
+
 
     production_data = pd.read_csv(
         PRODUCTION_DATA_FILE
@@ -371,11 +545,14 @@ def main():
     # -----------------------------------------------------
 
     print("\n")
+
     print("=" * 90)
+
 
     print(
         "ROOT CAUSE ANALYSIS"
     )
+
 
     print("=" * 90)
 
@@ -400,17 +577,22 @@ def main():
 
 
     print("\n")
+
     print("=" * 90)
+
 
     print(
         "RECOMMENDATION"
     )
 
+
     print("=" * 90)
+
 
     print(
         recommendation
     )
+
 
     print("=" * 90)
 
