@@ -1,12 +1,9 @@
-import math
+import json
 
-import numpy as np
-import pandas as pd
+from fastapi import APIRouter, HTTPException
 
-from fastapi import APIRouter
-
-from app.services.reliability_service import (
-    generate_reliability_report,
+from app.services.reliability_snapshot_service import (
+    load_reliability_snapshot,
 )
 
 
@@ -21,110 +18,49 @@ router = APIRouter(
 
 
 # ---------------------------------------------------------
-# 2. JSON CLEANER
+# 2. SAFE SNAPSHOT LOADER
 # ---------------------------------------------------------
 
-def clean_for_json(value):
+def get_snapshot():
     """
-    Converts Pandas and NumPy values into
-    standard Python values that FastAPI
-    can safely return as JSON.
+    Load the precomputed reliability snapshot.
+
+    The API no longer reruns the complete ML monitoring
+    pipeline for every request.
     """
 
-    # Pandas DataFrame
-    if isinstance(value, pd.DataFrame):
+    try:
 
-        records = value.to_dict(
-            orient="records"
-        )
+        return load_reliability_snapshot()
 
-        return clean_for_json(
-            records
-        )
+    except FileNotFoundError as error:
 
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Reliability snapshot is not available. "
+                "Generate it with: "
+                "python -m scripts.generate_reliability_snapshot"
+            ),
+        ) from error
 
-    # Pandas Series
-    if isinstance(value, pd.Series):
+    except json.JSONDecodeError as error:
 
-        return clean_for_json(
-            value.to_dict()
-        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Reliability snapshot contains invalid JSON."
+            ),
+        ) from error
 
+    except Exception as error:
 
-    # Dictionary
-    if isinstance(value, dict):
-
-        return {
-            key: clean_for_json(item)
-            for key, item in value.items()
-        }
-
-
-    # List or Tuple
-    if isinstance(
-        value,
-        (list, tuple),
-    ):
-
-        return [
-            clean_for_json(item)
-            for item in value
-        ]
-
-
-    # NumPy Array
-    if isinstance(
-        value,
-        np.ndarray,
-    ):
-
-        return clean_for_json(
-            value.tolist()
-        )
-
-
-    # NumPy Integer
-    if isinstance(
-        value,
-        np.integer,
-    ):
-
-        return int(value)
-
-
-    # NumPy Float
-    if isinstance(
-        value,
-        np.floating,
-    ):
-
-        value = float(value)
-
-        if (
-            math.isnan(value)
-            or math.isinf(value)
-        ):
-            return None
-
-        return value
-
-
-    # Standard Python Float
-    if isinstance(
-        value,
-        float,
-    ):
-
-        if (
-            math.isnan(value)
-            or math.isinf(value)
-        ):
-            return None
-
-        return value
-
-
-    return value
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Unable to load reliability snapshot."
+            ),
+        ) from error
 
 
 # ---------------------------------------------------------
@@ -134,9 +70,7 @@ def clean_for_json(value):
 @router.get("/reliability")
 def get_reliability_report():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
     response = {
@@ -280,12 +214,21 @@ def get_reliability_report():
             report[
                 "recommendation"
             ],
+
+
+        # -------------------------------------------------
+        # SNAPSHOT INFO
+        # -------------------------------------------------
+
+        "snapshot_metadata":
+            report.get(
+                "snapshot_metadata",
+                {},
+            ),
     }
 
 
-    return clean_for_json(
-        response
-    )
+    return response
 
 
 # ---------------------------------------------------------
@@ -295,21 +238,12 @@ def get_reliability_report():
 @router.get("/data-quality")
 def get_data_quality():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
-    response = (
-        report[
-            "data_quality"
-        ]
-    )
-
-
-    return clean_for_json(
-        response
-    )
+    return report[
+        "data_quality"
+    ]
 
 
 # ---------------------------------------------------------
@@ -319,9 +253,7 @@ def get_data_quality():
 @router.get("/drift")
 def get_drift_report():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
     response = {
@@ -342,9 +274,7 @@ def get_drift_report():
     }
 
 
-    return clean_for_json(
-        response
-    )
+    return response
 
 
 # ---------------------------------------------------------
@@ -354,9 +284,7 @@ def get_drift_report():
 @router.get("/performance")
 def get_performance():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
     performance = (
@@ -390,9 +318,7 @@ def get_performance():
     }
 
 
-    return clean_for_json(
-        response
-    )
+    return response
 
 
 # ---------------------------------------------------------
@@ -402,9 +328,7 @@ def get_performance():
 @router.get("/root-causes")
 def get_root_causes():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
     response = {
@@ -421,9 +345,7 @@ def get_root_causes():
     }
 
 
-    return clean_for_json(
-        response
-    )
+    return response
 
 
 # ---------------------------------------------------------
@@ -433,9 +355,7 @@ def get_root_causes():
 @router.get("/anomalies")
 def get_anomalies():
 
-    report = (
-        generate_reliability_report()
-    )
+    report = get_snapshot()
 
 
     anomaly_report = (
@@ -474,6 +394,4 @@ def get_anomalies():
     }
 
 
-    return clean_for_json(
-        response
-    )
+    return response

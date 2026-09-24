@@ -1,0 +1,414 @@
+{
+  "overall_status": "CRITICAL",
+  "data_quality": {
+    "status": "HEALTHY",
+    "score": 100.0,
+    "missing_columns": [],
+    "missing_values": {},
+    "duplicates": 0,
+    "numerical_issues": {},
+    "categorical_issues": {}
+  },
+  "data_drift": {
+    "status": "CRITICAL",
+    "report": [
+      {
+        "feature": "customer_age",
+        "feature_type": "numerical",
+        "drift_level": "LOW",
+        "score": 0.0418,
+        "p_value": 1.7e-05
+      },
+      {
+        "feature": "transaction_amount",
+        "feature_type": "numerical",
+        "drift_level": "HIGH",
+        "score": 0.2866,
+        "p_value": 0.0
+      },
+      {
+        "feature": "transaction_hour",
+        "feature_type": "numerical",
+        "drift_level": "LOW",
+        "score": 0.0087,
+        "p_value": 0.961846
+      },
+      {
+        "feature": "account_age_days",
+        "feature_type": "numerical",
+        "drift_level": "HIGH",
+        "score": 0.2027,
+        "p_value": 0.0
+      },
+      {
+        "feature": "previous_transactions",
+        "feature_type": "numerical",
+        "drift_level": "HIGH",
+        "score": 0.403,
+        "p_value": 0.0
+      },
+      {
+        "feature": "failed_transactions_last_24h",
+        "feature_type": "numerical",
+        "drift_level": "HIGH",
+        "score": 0.2682,
+        "p_value": 0.0
+      },
+      {
+        "feature": "is_international",
+        "feature_type": "numerical",
+        "drift_level": "LOW",
+        "score": 0.0641,
+        "p_value": 0.0
+      },
+      {
+        "feature": "payment_method",
+        "feature_type": "categorical",
+        "drift_level": "HIGH",
+        "score": 0.2749,
+        "p_value": null
+      },
+      {
+        "feature": "device_type",
+        "feature_type": "categorical",
+        "drift_level": "MODERATE",
+        "score": 0.1585,
+        "p_value": null
+      },
+      {
+        "feature": "customer_location",
+        "feature_type": "categorical",
+        "drift_level": "LOW",
+        "score": 0.0367,
+        "p_value": null
+      }
+    ]
+  },
+  "model_performance": {
+    "status": "HEALTHY",
+    "reference_metrics": {
+      "accuracy": 0.962,
+      "precision": 0.5,
+      "recall": 0.013157894736842105,
+      "f1": 0.02564102564102564,
+      "confusion_matrix": [
+        [
+          1923,
+          1
+        ],
+        [
+          75,
+          1
+        ]
+      ]
+    },
+    "production_metrics": {
+      "accuracy": 0.9564,
+      "precision": 0.662621359223301,
+      "recall": 0.7755681818181818,
+      "f1": 0.7146596858638743,
+      "confusion_matrix": [
+        [
+          4509,
+          139
+        ],
+        [
+          79,
+          273
+        ]
+      ]
+    },
+    "performance_drop": {
+      "accuracy": 0.005599999999999938,
+      "precision": -0.162621359223301,
+      "recall": -0.7624102870813396,
+      "f1": -0.6890186602228486
+    }
+  },
+  "anomaly_detection": {
+    "status": "CRITICAL",
+    "total_transactions": 5000,
+    "anomaly_count": 834,
+    "anomaly_percentage": 16.68,
+    "top_anomalies": [
+      {
+        "transaction_id": 14494,
+        "customer_age": 35,
+        "transaction_amount": 17903.84,
+        "transaction_hour": 7,
+        "payment_method": "UPI",
+        "device_type": "Mobile",
+        "customer_location": "Pune",
+        "account_age_days": 1425,
+        "previous_transactions": 20,
+        "failed_transactions_last_24h": 2,
+        "is_international": 1,
+        "is_fraud": 1,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.12787337766335694,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 12163,
+        "customer_age": 24,
+        "transaction_amount": 15194.15,
+        "transaction_hour": 2,
+        "payment_method": "Credit Card",
+        "device_type": "Mobile",
+        "customer_location": "Mumbai",
+        "account_age_days": 608,
+        "previous_transactions": 13,
+        "failed_transactions_last_24h": 1,
+        "is_international": 1,
+        "is_fraud": 1,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.12584028099825206,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 14021,
+        "customer_age": 33,
+        "transaction_amount": 12365.08,
+        "transaction_hour": 12,
+        "payment_method": "UPI",
+        "device_type": "Mobile",
+        "customer_location": "Mumbai",
+        "account_age_days": 40,
+        "previous_transactions": 16,
+        "failed_transactions_last_24h": 4,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.12540866347284274,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 12633,
+        "customer_age": 18,
+        "transaction_amount": 8976.64,
+        "transaction_hour": 16,
+        "payment_method": "UPI",
+        "device_type": "Desktop",
+        "customer_location": "Jaipur",
+        "account_age_days": 1140,
+        "previous_transactions": 16,
+        "failed_transactions_last_24h": 2,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.12353329758309828,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 12542,
+        "customer_age": 39,
+        "transaction_amount": 17851.54,
+        "transaction_hour": 19,
+        "payment_method": "Debit Card",
+        "device_type": "Desktop",
+        "customer_location": "Pune",
+        "account_age_days": 113,
+        "previous_transactions": 23,
+        "failed_transactions_last_24h": 3,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.12326142738643697,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 10328,
+        "customer_age": 57,
+        "transaction_amount": 5981.34,
+        "transaction_hour": 17,
+        "payment_method": "UPI",
+        "device_type": "Mobile",
+        "customer_location": "Ahmedabad",
+        "account_age_days": 212,
+        "previous_transactions": 16,
+        "failed_transactions_last_24h": 5,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.11860827594145762,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 14129,
+        "customer_age": 34,
+        "transaction_amount": 25741.57,
+        "transaction_hour": 1,
+        "payment_method": "Debit Card",
+        "device_type": "Desktop",
+        "customer_location": "Pune",
+        "account_age_days": 305,
+        "previous_transactions": 8,
+        "failed_transactions_last_24h": 3,
+        "is_international": 0,
+        "is_fraud": 1,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.11697753939220401,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 14554,
+        "customer_age": 39,
+        "transaction_amount": 17045.75,
+        "transaction_hour": 7,
+        "payment_method": "Credit Card",
+        "device_type": "Mobile",
+        "customer_location": "Bengaluru",
+        "account_age_days": 509,
+        "previous_transactions": 14,
+        "failed_transactions_last_24h": 2,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.11615877801748076,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 12406,
+        "customer_age": 18,
+        "transaction_amount": 17998.59,
+        "transaction_hour": 0,
+        "payment_method": "Credit Card",
+        "device_type": "Mobile",
+        "customer_location": "Mumbai",
+        "account_age_days": 196,
+        "previous_transactions": 16,
+        "failed_transactions_last_24h": 3,
+        "is_international": 0,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.11529206165390904,
+        "is_anomaly": true
+      },
+      {
+        "transaction_id": 13944,
+        "customer_age": 29,
+        "transaction_amount": 3860.39,
+        "transaction_hour": 0,
+        "payment_method": "Debit Card",
+        "device_type": "Mobile",
+        "customer_location": "Pune",
+        "account_age_days": 1804,
+        "previous_transactions": 22,
+        "failed_transactions_last_24h": 3,
+        "is_international": 1,
+        "is_fraud": 0,
+        "anomaly_prediction": -1,
+        "anomaly_score": -0.11508892575950136,
+        "is_anomaly": true
+      }
+    ]
+  },
+  "root_cause": [
+    {
+      "feature": "transaction_amount",
+      "feature_type": "numerical",
+      "drift_level": "HIGH",
+      "score": 0.2866,
+      "p_value": 0.0,
+      "model_importance": 0.1453321376687981,
+      "root_cause_score": 4.1652190655877535,
+      "root_cause_priority": "HIGH"
+    },
+    {
+      "feature": "previous_transactions",
+      "feature_type": "numerical",
+      "drift_level": "HIGH",
+      "score": 0.403,
+      "p_value": 0.0,
+      "model_importance": 0.09880133183438607,
+      "root_cause_score": 3.981693672925759,
+      "root_cause_priority": "MEDIUM"
+    },
+    {
+      "feature": "account_age_days",
+      "feature_type": "numerical",
+      "drift_level": "HIGH",
+      "score": 0.2027,
+      "p_value": 0.0,
+      "model_importance": 0.1962848128747035,
+      "root_cause_score": 3.97869315697024,
+      "root_cause_priority": "HIGH"
+    },
+    {
+      "feature": "failed_transactions_last_24h",
+      "feature_type": "numerical",
+      "drift_level": "HIGH",
+      "score": 0.2682,
+      "p_value": 0.0,
+      "model_importance": 0.06459240220850962,
+      "root_cause_score": 1.7323682272322278,
+      "root_cause_priority": "MEDIUM"
+    },
+    {
+      "feature": "payment_method",
+      "feature_type": "categorical",
+      "drift_level": "HIGH",
+      "score": 0.2749,
+      "p_value": null,
+      "model_importance": 0.04386362905192298,
+      "root_cause_score": 1.2058111626373627,
+      "root_cause_priority": "LOW"
+    },
+    {
+      "feature": "customer_age",
+      "feature_type": "numerical",
+      "drift_level": "LOW",
+      "score": 0.0418,
+      "p_value": 1.7e-05,
+      "model_importance": 0.10827785282882957,
+      "root_cause_score": 0.45260142482450755,
+      "root_cause_priority": "LOW"
+    },
+    {
+      "feature": "is_international",
+      "feature_type": "numerical",
+      "drift_level": "LOW",
+      "score": 0.0641,
+      "p_value": 0.0,
+      "model_importance": 0.06953046071558022,
+      "root_cause_score": 0.4456902531868693,
+      "root_cause_priority": "LOW"
+    },
+    {
+      "feature": "device_type",
+      "feature_type": "categorical",
+      "drift_level": "MODERATE",
+      "score": 0.1585,
+      "p_value": null,
+      "model_importance": 0.02504433469908085,
+      "root_cause_score": 0.3969527049804315,
+      "root_cause_priority": "LOW"
+    },
+    {
+      "feature": "customer_location",
+      "feature_type": "categorical",
+      "drift_level": "LOW",
+      "score": 0.0367,
+      "p_value": null,
+      "model_importance": 0.06673066332544036,
+      "root_cause_score": 0.24490153440436618,
+      "root_cause_priority": "LOW"
+    },
+    {
+      "feature": "transaction_hour",
+      "feature_type": "numerical",
+      "drift_level": "LOW",
+      "score": 0.0087,
+      "p_value": 0.961846,
+      "model_importance": 0.18154237479274865,
+      "root_cause_score": 0.15794186606969132,
+      "root_cause_priority": "LOW"
+    }
+  ],
+  "recommendation": "Investigate recent changes in transaction_amount, account_age_days. These features show significant drift and are important to the current model. Consider validating the production data and retraining the model using recent data.",
+  "snapshot_metadata": {
+    "generated_at": "2026-09-24T10:31:55.927133+00:00",
+    "source": "reliability_snapshot",
+    "mode": "precomputed"
+  }
+}
