@@ -1232,9 +1232,7 @@ export default function ScrollExperience() {
             >
 
               <a
-                href="http://localhost:8501"
-                target="_blank"
-                rel="noreferrer"
+                href="/dashboard"
                 className="
                   rounded-full
                   bg-black
@@ -1255,7 +1253,7 @@ export default function ScrollExperience() {
 
 
               <a
-                href="http://127.0.0.1:8000/docs"
+                href="https://enterprise-ai-reliability-platform.onrender.com/docs"
                 target="_blank"
                 rel="noreferrer"
                 className="

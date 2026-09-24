@@ -1,27 +1,47 @@
 import os
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import (
+    CORSMiddleware,
+)
 
 from app.api.reliability_routes import (
     router as reliability_router,
 )
 
+from app.api.deployment_routes import (
+    router as deployment_router,
+)
+
+from app.api.self_healing_routes import (
+    router as self_healing_router,
+)
+
+
+# =========================================================
+# APPLICATION
+# =========================================================
 
 app = FastAPI(
-    title="Enterprise AI Reliability Platform",
-    description=(
-        "Platform for monitoring AI model health, "
-        "data quality, data drift, model performance, "
-        "anomalies and root causes."
-    ),
+    title=
+        "Enterprise AI Reliability Platform",
+
+    description=
+        (
+            "Production-style AI reliability "
+            "monitoring, drift detection, "
+            "anomaly detection, root-cause "
+            "analysis, controlled model promotion, "
+            "rollback, and autonomous self-healing."
+        ),
+
     version="1.0.0",
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CORS
-# ---------------------------------------------------------
+# =========================================================
 
 allowed_origins = [
     "http://localhost:3000",
@@ -31,26 +51,59 @@ allowed_origins = [
 ]
 
 
-frontend_url = os.getenv("FRONTEND_URL")
+# ---------------------------------------------------------
+# Production frontend URL
+# ---------------------------------------------------------
+
+frontend_url = os.getenv(
+    "FRONTEND_URL"
+)
 
 
 if frontend_url:
+
     allowed_origins.append(
         frontend_url.rstrip("/")
     )
 
 
+# ---------------------------------------------------------
+# CORS middleware
+# ---------------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+
+    allow_origins=
+        allowed_origins,
+
+    allow_credentials=
+        True,
+
+    allow_methods=[
+        "*"
+    ],
+
+    allow_headers=[
+        "*"
+    ],
 )
 
 
+# =========================================================
+# API ROUTERS
+# =========================================================
+
 # ---------------------------------------------------------
-# ROUTES
+# Reliability monitoring
+#
+# Includes:
+# /api/reliability
+# /api/data-quality
+# /api/drift
+# /api/performance
+# /api/root-causes
+# /api/anomalies
 # ---------------------------------------------------------
 
 app.include_router(
@@ -58,16 +111,93 @@ app.include_router(
 )
 
 
+# ---------------------------------------------------------
+# Deployment lifecycle
+#
+# Includes:
+# /api/deployment
+# ---------------------------------------------------------
+
+app.include_router(
+    deployment_router
+)
+
+
+# ---------------------------------------------------------
+# Autonomous self-healing lifecycle
+#
+# Includes:
+# /api/self-healing
+# ---------------------------------------------------------
+
+app.include_router(
+    self_healing_router
+)
+
+
+# =========================================================
+# ROOT ENDPOINT
+# =========================================================
+
 @app.get("/")
 def root():
+
     return {
-        "message":
-            "Enterprise AI Reliability Platform is running."
+
+        "service":
+            "Enterprise AI Reliability Platform",
+
+        "status":
+            "running",
+
+        "version":
+            "1.0.0",
+
+        "capabilities": [
+            "data-quality-monitoring",
+            "data-drift-detection",
+            "model-performance-monitoring",
+            "anomaly-detection",
+            "root-cause-analysis",
+            "challenger-model-training",
+            "quality-gate-evaluation",
+            "model-promotion",
+            "model-rollback",
+            "conditional-self-healing",
+        ],
+
+        "endpoints": {
+
+            "health":
+                "/health",
+
+            "reliability":
+                "/api/reliability",
+
+            "deployment":
+                "/api/deployment",
+
+            "self_healing":
+                "/api/self-healing",
+
+            "docs":
+                "/docs",
+        },
     }
 
 
+# =========================================================
+# HEALTH ENDPOINT
+# =========================================================
+
 @app.get("/health")
 def health():
+
     return {
-        "status": "healthy"
+
+        "status":
+            "healthy",
+
+        "service":
+            "enterprise-ai-reliability-platform",
     }

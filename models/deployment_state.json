@@ -1,0 +1,12 @@
+{
+    "registered_model": "FraudDetectionModel",
+    "champion_version": "2",
+    "previous_champion_version": "1",
+    "active_model_path": "D:\\Aastha\\college\\6th sem\\proj\\enterprise-ai-reliability-platform\\models\\fraud_model.joblib",
+    "previous_model_backup": "D:\\Aastha\\college\\6th sem\\proj\\enterprise-ai-reliability-platform\\models\\archive\\fraud_model_v1.joblib",
+    "challenger_source_path": "D:\\Aastha\\college\\6th sem\\proj\\enterprise-ai-reliability-platform\\models\\challenger_fraud_model.joblib",
+    "promotion_decision": "CHALLENGER_ELIGIBLE_FOR_PROMOTION",
+    "promoted_at": "2026-09-23T19:21:35.030108+00:00",
+    "rollback_available": true,
+    "previous_deployment_state": null
+}

@@ -1,68 +1,137 @@
-# Python
+# =========================================================
+# PYTHON
+# =========================================================
+
 __pycache__/
 *.py[cod]
 *$py.class
 
-# Virtual environment
 venv/
 .venv/
-
-# Environment variables
-.env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# ---------------------------------------------------------
-# DATA
-# ---------------------------------------------------------
-
-# Ignore generated/temporary processed data
-data/processed/*
-
-# Ignore production data by default
-data/production/*
-
-# But keep the production dataset required by the demo/API
-!data/production/transactions_production.csv
-
-
-# ---------------------------------------------------------
-# MODEL ARTIFACTS
-# ---------------------------------------------------------
-
-# Ignore arbitrary model artifacts
-models/*.pkl
-models/*.joblib
-
-# Keep the trained models required by the deployed API
-!models/fraud_model.joblib
-!models/anomaly_detector.joblib
-!models/anomaly_scaler.joblib
-
-# baseline_metrics.json is not ignored and will be committed
-
-
-# ---------------------------------------------------------
-# TESTING
-# ---------------------------------------------------------
 
 .pytest_cache/
 
 
+# =========================================================
+# ENVIRONMENT FILES
+# =========================================================
+
+.env
+.env.local
+.env.*
+
+
+# =========================================================
+# IDE / EDITOR
+# =========================================================
+
+.vscode/
+.idea/
+
+
+# =========================================================
+# OPERATING SYSTEM
+# =========================================================
+
+.DS_Store
+Thumbs.db
+
+
+# =========================================================
+# LOGS
+# =========================================================
+
+*.log
+logs/
+
+
+# =========================================================
+# DATA
+# =========================================================
+
+data/processed/*
+
+data/production/*
+
+# Keep production dataset for demo/deployment
+!data/production/transactions_production.csv
+
+
+# =========================================================
+# MODEL ARTIFACTS
+# =========================================================
+
+# Ignore generic serialized models
+models/*.pkl
+models/*.joblib
+
+
 # ---------------------------------------------------------
-# MLFLOW
+# Keep production model
 # ---------------------------------------------------------
+
+!models/fraud_model.joblib
+
+
+# ---------------------------------------------------------
+# Keep anomaly detector artifacts
+# ---------------------------------------------------------
+
+!models/anomaly_detector.joblib
+!models/anomaly_scaler.joblib
+
+
+# ---------------------------------------------------------
+# Challenger model stays local
+# ---------------------------------------------------------
+
+models/challenger_fraud_model.joblib
+
+
+# ---------------------------------------------------------
+# Local rollback archives should NEVER be committed
+# ---------------------------------------------------------
+
+models/archive/
+
+
+# =========================================================
+# SELF-HEALING / DEPLOYMENT METADATA
+# =========================================================
+
+# These files SHOULD be committed because the deployed
+# backend/dashboard needs the current model lifecycle state.
+
+!models/baseline_metrics.json
+!models/challenger_comparison.json
+!models/deployment_state.json
+
+
+# =========================================================
+# MLFLOW LOCAL STORAGE
+# =========================================================
 
 mlruns/
 mlflow.db
+
+
+# =========================================================
+# NEXT.JS / NODE
+# =========================================================
+
+web/node_modules/
+web/.next/
+web/out/
+
+web/.env
+web/.env.local
+web/.env.*
+
+
+# =========================================================
+# BUILD / CACHE FILES
+# =========================================================
+
+*.tmp
+*.temp
+.cache/
