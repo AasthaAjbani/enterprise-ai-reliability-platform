@@ -1,6 +1,6 @@
 # Enterprise AI Reliability Platform
 
-An end-to-end **AI reliability and self-healing platform** designed to monitor machine learning systems after deployment, detect reliability failures, diagnose likely causes, and automatically recover from severe model degradation through controlled retraining and champion–challenger promotion.
+An end-to-end **AI reliability and self-healing platform** designed to monitor deployed machine learning systems, detect reliability failures, diagnose likely causes, and automatically recover from severe model degradation through controlled retraining and champion–challenger promotion.
 
 The project demonstrates a production-oriented ML reliability workflow using **FastAPI, Next.js, scikit-learn, MLflow, Render, and Netlify**.
 
@@ -19,6 +19,93 @@ https://enterprise-ai-reliability-platform.onrender.com
 ### GitHub Repository
 
 https://github.com/AasthaAjbani/enterprise-ai-reliability-platform
+
+---
+
+# Platform Screenshots
+
+## Home
+
+![Home Page](docs/screenshots/01-home.png)
+
+---
+
+## Reliability Dashboard
+
+The main dashboard provides a consolidated view of system reliability across data drift, model performance, anomalies, and root-cause indicators.
+
+![Dashboard Overview](docs/screenshots/02-dashboard-overview.png)
+
+The current system can remain **CRITICAL** even when model performance is healthy because unresolved production-data drift is monitored independently.
+
+---
+
+## Model Performance Monitoring
+
+The performance view tracks the active champion using accuracy, precision, recall, F1 score, and degradation against its accepted baseline.
+
+![Performance Monitoring](docs/screenshots/03-performance.png)
+
+Current V3 monitoring state:
+
+```text
+Accuracy     87.13%
+Precision    16.83%
+Recall       13.49%
+F1           14.98%
+Status       HEALTHY
+```
+
+---
+
+## Data Drift Monitoring
+
+The drift dashboard identifies feature-level distribution changes and classifies them as LOW, MODERATE, or HIGH severity.
+
+![Data Drift](docs/screenshots/04-drift.png)
+
+Examples from the current production batch include:
+
+```text
+previous_transactions              HIGH
+failed_transactions_last_24h       HIGH
+payment_method                     HIGH
+transaction_hour                   MODERATE
+device_type                        MODERATE
+```
+
+---
+
+## Anomaly Detection
+
+Isolation Forest is used independently from the fraud classifier to identify unusual transaction patterns.
+
+![Anomaly Detection](docs/screenshots/05-anomalies.png)
+
+Current monitored batch:
+
+```text
+Transactions     5000
+Anomalies         207
+Anomaly Rate     4.14%
+Status           HEALTHY
+```
+
+---
+
+## Root-Cause Prioritization
+
+The root-cause view combines production drift with model feature importance to prioritize features that may require investigation.
+
+![Root Cause Analysis](docs/screenshots/06-root-cause.png)
+
+The current highest-priority feature is:
+
+```text
+previous_transactions
+```
+
+The ranking is a diagnostic heuristic and should not be interpreted as causal proof.
 
 ---
 
@@ -62,7 +149,7 @@ Verify Deployment
 Continue Monitoring
 ```
 
-The platform continuously evaluates several reliability dimensions:
+The platform evaluates multiple reliability dimensions:
 
 - Data quality
 - Data drift
@@ -78,7 +165,7 @@ The platform continuously evaluates several reliability dimensions:
 
 ## AI Reliability Dashboard
 
-A modern dashboard presents the current state of the ML system, including:
+The dashboard presents the current state of the ML system, including:
 
 - Overall reliability status
 - Data drift severity
@@ -97,11 +184,11 @@ A modern dashboard presents the current state of the ML system, including:
 
 The platform compares reference data against new production data.
 
-### Numerical features
+### Numerical Features
 
-Drift is detected using the **Kolmogorov-Smirnov test**.
+Numerical drift is detected using the **Kolmogorov-Smirnov test**.
 
-### Categorical features
+### Categorical Features
 
 Categorical distribution differences are evaluated using **Total Variation Distance**.
 
@@ -147,15 +234,15 @@ The active production model is evaluated using:
 - F1 score
 - Confusion matrix
 
-For promoted models, the monitoring service uses the model's **persisted accepted baseline**, rather than comparing against an outdated original model.
+For promoted models, the monitoring service uses the model's **persisted accepted baseline** rather than comparing against an outdated original model.
 
-This makes monitoring version-aware.
+This makes the monitoring process version-aware.
 
 ---
 
 # Self-Healing ML Pipeline
 
-The main feature of the platform is its autonomous recovery workflow.
+The main feature of the platform is its automated recovery workflow.
 
 When severe model performance degradation is detected, the system can execute:
 
@@ -187,7 +274,7 @@ Rollback Available
 
 The system monitors degradation in important fraud-classification metrics.
 
-Thresholds:
+Current thresholds:
 
 ```text
 Warning degradation  = 5 percentage points
@@ -212,18 +299,18 @@ When healing is triggered:
 2. Recent production data is split into:
    - 70% recent training data
    - 30% untouched validation data
-3. The challenger is trained using historical + recent training data.
-4. Both the current champion and challenger are evaluated on the same untouched validation set.
+3. The challenger is trained using historical and recent training data.
+4. The current champion and challenger are evaluated on the same untouched validation set.
 
-This prevents the promotion decision from being based on training data.
+This prevents the promotion decision from being based on the challenger training data.
 
 ---
 
-# Quality Gate
+# Promotion Quality Gate
 
 A challenger is not promoted simply because retraining completed.
 
-The challenger must satisfy predefined promotion rules.
+It must satisfy predefined promotion rules.
 
 Current rules:
 
@@ -257,7 +344,7 @@ challenger
 previous_champion
 ```
 
-This creates a clear model lineage and allows rollback.
+This provides clear model lineage and allows the previous champion to remain available for rollback.
 
 ---
 
@@ -268,18 +355,18 @@ Promotion is followed by a verification stage.
 The platform confirms:
 
 - The expected champion version was promoted
-- The active model artifact matches the challenger artifact
+- The active model artifact matches the validated challenger artifact
 - The deployed model reproduces expected validation metrics
 - The previous champion remains available
 - Rollback is possible
 
-Artifact hashes are used to verify that the promoted model is the correct model.
+Artifact hashes are used to verify that the promoted model is the expected model artifact.
 
 ---
 
 # Self-Healing Demonstration
 
-A controlled second production batch was generated to simulate concept drift that was not used to train the current V2 champion.
+A controlled second production batch was generated to simulate concept drift that was not used to train the V2 champion.
 
 The active V2 model experienced severe degradation.
 
@@ -298,13 +385,13 @@ The large recall and F1 degradation caused the system to enter:
 CRITICAL
 ```
 
-and triggered self-healing.
+and triggered the self-healing pipeline.
 
 ---
 
 # Challenger Evaluation
 
-V2 and V3 were evaluated using the same untouched 30% validation split.
+V2 and V3 were evaluated using the same untouched 30% production validation split.
 
 | Metric | V2 Champion | V3 Challenger |
 |---|---:|---:|
@@ -321,13 +408,13 @@ Recall improvement    +11.11 percentage points
 Precision change       +5.72 percentage points
 ```
 
-The challenger passed the quality gate.
+The challenger passed the promotion quality gate.
 
 ---
 
 # Successful Recovery
 
-The V3 challenger was promoted to production.
+The V3 challenger was promoted to the active champion.
 
 Final lifecycle state:
 
@@ -355,9 +442,9 @@ Model Performance       HEALTHY
 Anomaly Detection       HEALTHY
 ```
 
-This is intentional.
+This behavior is intentional.
 
-The self-healing process corrected the model performance degradation, but the underlying production distribution still contains significant drift.
+The self-healing process recovered model performance, but the underlying production distribution still contains significant drift.
 
 The platform therefore does **not** incorrectly report the entire system as healthy after retraining.
 
@@ -395,7 +482,7 @@ Example high-priority feature:
 previous_transactions
 ```
 
-The result is intended as a **diagnostic heuristic**, not proof of causal relationships.
+The result is intended as a **diagnostic heuristic**, not proof of a causal relationship.
 
 ---
 
@@ -496,6 +583,12 @@ Status             HEALTHY
                     └────────────────────┘
 ```
 
+A more detailed architecture description is available in:
+
+```text
+docs/architecture.md
+```
+
 ---
 
 # Technology Stack
@@ -508,7 +601,7 @@ Status             HEALTHY
 - NumPy
 - Joblib
 
-## Reliability & MLOps
+## Reliability and MLOps
 
 - MLflow
 - Champion–challenger model lifecycle
@@ -582,6 +675,11 @@ enterprise-ai-reliability-platform/
 │   ├── package.json
 │   └── next.config.ts
 │
+├── docs/
+│   ├── architecture.md
+│   ├── demo-flow.md
+│   └── screenshots/
+│
 ├── requirements.txt
 ├── netlify.toml
 └── README.md
@@ -596,8 +694,6 @@ enterprise-ai-reliability-platform/
 ```http
 GET /health
 ```
-
----
 
 ## Complete Reliability Report
 
@@ -615,15 +711,11 @@ Returns:
 - Root causes
 - Recommendation
 
----
-
 ## Data Quality
 
 ```http
 GET /api/data-quality
 ```
-
----
 
 ## Drift Monitoring
 
@@ -631,15 +723,11 @@ GET /api/data-quality
 GET /api/drift
 ```
 
----
-
 ## Performance Monitoring
 
 ```http
 GET /api/performance
 ```
-
----
 
 ## Anomaly Monitoring
 
@@ -647,15 +735,11 @@ GET /api/performance
 GET /api/anomalies
 ```
 
----
-
 ## Root-Cause Analysis
 
 ```http
 GET /api/root-causes
 ```
-
----
 
 ## Deployment State
 
@@ -673,31 +757,26 @@ Quality gate decision
 Validation metrics
 ```
 
----
-
 ## Self-Healing State
 
 ```http
 GET /api/self-healing
 ```
 
-Returns the autonomous recovery lifecycle state.
+Returns the stored self-healing lifecycle state.
 
 ---
 
 # Local Installation
 
-## 1. Clone the repository
+## 1. Clone the Repository
 
 ```powershell
 git clone https://github.com/AasthaAjbani/enterprise-ai-reliability-platform.git
-
 cd enterprise-ai-reliability-platform
 ```
 
----
-
-## 2. Create a Python virtual environment
+## 2. Create a Python Virtual Environment
 
 ```powershell
 python -m venv venv
@@ -709,17 +788,13 @@ Activate it:
 .\venv\Scripts\Activate.ps1
 ```
 
----
-
-## 3. Install backend dependencies
+## 3. Install Backend Dependencies
 
 ```powershell
 pip install -r requirements.txt
 ```
 
----
-
-## 4. Start the FastAPI backend
+## 4. Start the FastAPI Backend
 
 ```powershell
 uvicorn app.main:app --reload
@@ -741,7 +816,7 @@ http://127.0.0.1:8000/docs
 
 # Frontend Setup
 
-Open another terminal.
+Open another terminal:
 
 ```powershell
 cd web
@@ -765,7 +840,7 @@ with:
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Start the application:
+Start the frontend:
 
 ```powershell
 npm run dev
@@ -793,7 +868,7 @@ Activate the Python environment:
 .\venv\Scripts\Activate.ps1
 ```
 
-Select the production batch:
+Select the controlled Batch 2 production dataset:
 
 ```powershell
 $env:HEALING_PRODUCTION_DATA="data/production/transactions_production_batch_2.csv"
@@ -820,9 +895,11 @@ The pipeline performs:
 
 ---
 
-# Generate Reliability Snapshot
+# Reliability Snapshot
 
-Production API requests use a precomputed reliability snapshot to avoid expensive ML computation on every request.
+Running all monitoring calculations on every API request would be expensive.
+
+The platform therefore supports a precomputed reliability snapshot.
 
 Generate it using:
 
@@ -836,7 +913,7 @@ Generated file:
 models/reliability_snapshot.json
 ```
 
-The API can then serve the monitoring dashboard using the lightweight snapshot.
+The deployed `/api/reliability` endpoint can then serve the monitoring dashboard using this lightweight precomputed state.
 
 ---
 
@@ -850,13 +927,11 @@ Hosted on:
 Netlify
 ```
 
-Environment variable:
+Production environment variable:
 
 ```text
 NEXT_PUBLIC_API_BASE_URL=https://enterprise-ai-reliability-platform.onrender.com
 ```
-
----
 
 ## Backend
 
@@ -872,13 +947,13 @@ Production CORS configuration allows requests from the deployed Netlify frontend
 
 # Design Decisions
 
-## Why use F1 and Recall?
+## Why Use F1 and Recall?
 
 The project uses fraud classification, which is an imbalanced classification problem.
 
 Accuracy alone can therefore be misleading.
 
-For example, a model could predict most transactions as legitimate and still achieve high accuracy while failing to identify fraudulent transactions.
+A model could predict most transactions as legitimate and still achieve high accuracy while failing to identify fraudulent transactions.
 
 For this reason, the promotion gate emphasizes:
 
@@ -891,7 +966,7 @@ while still controlling precision loss.
 
 ---
 
-## Why can V3 have lower accuracy but still be promoted?
+## Why Can V3 Have Lower Accuracy but Still Be Promoted?
 
 V3 achieved slightly lower overall accuracy but substantially improved:
 
@@ -905,11 +980,11 @@ Promotion is therefore determined using predefined reliability criteria rather t
 
 ---
 
-## Why is the system still CRITICAL after self-healing?
+## Why Is the System Still CRITICAL After Self-Healing?
 
 The model performance recovered successfully.
 
-However, significant data distribution drift remains present in production data.
+However, significant data-distribution drift remains present in production data.
 
 Therefore:
 
@@ -954,10 +1029,10 @@ Potential extensions include:
 - SHAP-based model explainability
 - Advanced drift detectors
 - Model fairness monitoring
-- Notification integration using Slack or email
+- Slack or email notifications
 - Kubernetes deployment
 - CI/CD model validation
-- Multiple model support
+- Multiple-model support
 - Authentication and role-based access control
 
 ---
@@ -966,7 +1041,7 @@ Potential extensions include:
 
 The objective of this project is not simply to train a machine learning model.
 
-It is to demonstrate how an AI system can be engineered to:
+It demonstrates how an AI system can be engineered to:
 
 ```text
 Detect failure
@@ -977,7 +1052,17 @@ Preserve rollback
 Continue monitoring
 ```
 
-This represents the broader engineering requirements required for building dependable AI systems beyond model training alone.
+The project focuses on the broader engineering requirements involved in building dependable AI systems beyond model training alone.
+
+---
+
+# Documentation
+
+Additional documentation:
+
+- `docs/architecture.md` — system architecture
+- `docs/demo-flow.md` — recommended project demonstration flow
+- `docs/screenshots/` — platform screenshots
 
 ---
 
@@ -985,7 +1070,7 @@ This represents the broader engineering requirements required for building depen
 
 **Aastha Ajbani**
 
-B.Tech Computer Science / Data Science Project
+B.Tech Data Science Final-Year Project
 
 GitHub:
 
