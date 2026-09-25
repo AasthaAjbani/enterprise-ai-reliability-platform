@@ -1,6 +1,9 @@
-from pathlib import Path
+from __future__ import annotations
+
 import hashlib
 import json
+import os
+from pathlib import Path
 
 import joblib
 import pandas as pd
@@ -12,24 +15,22 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
+from sklearn.model_selection import train_test_split
 
 
 # =========================================================
 # PROJECT PATHS
 # =========================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parents[1]
+)
 
 MODELS_DIR = (
     PROJECT_ROOT
     / "models"
-)
-
-PRODUCTION_DATA_PATH = (
-    PROJECT_ROOT
-    / "data"
-    / "production"
-    / "transactions_production.csv"
 )
 
 ACTIVE_MODEL_PATH = (
@@ -45,6 +46,18 @@ CHALLENGER_MODEL_PATH = (
 DEPLOYMENT_STATE_PATH = (
     MODELS_DIR
     / "deployment_state.json"
+)
+
+COMPARISON_REPORT_PATH = (
+    MODELS_DIR
+    / "challenger_comparison.json"
+)
+
+DEFAULT_PRODUCTION_DATA_PATH = (
+    PROJECT_ROOT
+    / "data"
+    / "production"
+    / "transactions_production.csv"
 )
 
 
@@ -75,8 +88,95 @@ NUMERICAL_FEATURES = [
 
 FEATURE_COLUMNS = (
     CATEGORICAL_FEATURES
-    + NUMERICAL_FEATURES
+    +
+    NUMERICAL_FEATURES
 )
+
+
+# =========================================================
+# RESOLVE PRODUCTION DATASET
+# =========================================================
+
+def resolve_production_data_path(
+    comparison: dict,
+) -> Path:
+
+    """
+    Resolve the exact production dataset that was used
+    during challenger training.
+
+    Priority:
+
+    1. challenger_comparison.json
+    2. HEALING_PRODUCTION_DATA environment variable
+    3. Default production dataset
+    """
+
+    validation_strategy = (
+        comparison.get(
+            "validation_strategy",
+            {},
+        )
+    )
+
+
+    if isinstance(
+        validation_strategy,
+        dict,
+    ):
+
+        saved_path = (
+            validation_strategy.get(
+                "production_data_path"
+            )
+        )
+
+
+        if saved_path:
+
+            path = Path(
+                saved_path
+            )
+
+
+            if not path.is_absolute():
+
+                path = (
+                    PROJECT_ROOT
+                    / path
+                )
+
+
+            return path.resolve()
+
+
+    environment_path = os.getenv(
+        "HEALING_PRODUCTION_DATA"
+    )
+
+
+    if environment_path:
+
+        path = Path(
+            environment_path
+        )
+
+
+        if not path.is_absolute():
+
+            path = (
+                PROJECT_ROOT
+                / path
+            )
+
+
+        return path.resolve()
+
+
+    return (
+        DEFAULT_PRODUCTION_DATA_PATH
+        .resolve()
+    )
 
 
 # =========================================================
@@ -85,13 +185,12 @@ FEATURE_COLUMNS = (
 
 def calculate_sha256(
     path: Path,
-):
+) -> str:
 
     sha256 = hashlib.sha256()
 
 
-    with open(
-        path,
+    with path.open(
         "rb",
     ) as file:
 
@@ -103,6 +202,7 @@ def calculate_sha256(
 
 
             if not chunk:
+
                 break
 
 
@@ -115,26 +215,43 @@ def calculate_sha256(
 
 
 # =========================================================
-# LOAD DEPLOYMENT STATE
+# LOAD JSON
 # =========================================================
 
-def load_deployment_state():
+def load_json(
+    path: Path,
+) -> dict:
 
-    if not DEPLOYMENT_STATE_PATH.exists():
+    if not path.exists():
 
         raise FileNotFoundError(
-            "\nDeployment state not found:\n"
-            f"{DEPLOYMENT_STATE_PATH}"
+            f"Required JSON file not found:\n"
+            f"{path}"
         )
 
 
-    with open(
-        DEPLOYMENT_STATE_PATH,
+    with path.open(
         "r",
         encoding="utf-8",
     ) as file:
 
-        return json.load(file)
+        data = json.load(
+            file
+        )
+
+
+    if not isinstance(
+        data,
+        dict,
+    ):
+
+        raise ValueError(
+            f"Expected JSON object in:\n"
+            f"{path}"
+        )
+
+
+    return data
 
 
 # =========================================================
@@ -147,8 +264,10 @@ def calculate_metrics(
     y,
 ):
 
-    predictions = model.predict(
-        X
+    predictions = (
+        model.predict(
+            X
+        )
     )
 
 
@@ -210,24 +329,29 @@ def print_metrics(
         f"{metrics['accuracy']:.4f}"
     )
 
+
     print(
         f"Precision: "
         f"{metrics['precision']:.4f}"
     )
+
 
     print(
         f"Recall   : "
         f"{metrics['recall']:.4f}"
     )
 
+
     print(
         f"F1       : "
         f"{metrics['f1']:.4f}"
     )
 
+
     print(
         "Confusion Matrix:"
     )
+
 
     print(
         metrics[
@@ -242,21 +366,46 @@ def print_metrics(
 
 def main():
 
+    print()
     print(
-        "\n"
-        "=============================================="
+        "=" * 60
     )
 
     print(
-        " ENTERPRISE AI RELIABILITY PLATFORM"
+        "ENTERPRISE AI RELIABILITY PLATFORM"
     )
 
     print(
-        " PROMOTION VERIFICATION"
+        "PROMOTION VERIFICATION"
     )
 
     print(
-        "=============================================="
+        "=" * 60
+    )
+
+
+    # =====================================================
+    # LOAD STATE + COMPARISON
+    # =====================================================
+
+    deployment_state = (
+        load_json(
+            DEPLOYMENT_STATE_PATH
+        )
+    )
+
+
+    comparison = (
+        load_json(
+            COMPARISON_REPORT_PATH
+        )
+    )
+
+
+    production_data_path = (
+        resolve_production_data_path(
+            comparison
+        )
     )
 
 
@@ -268,7 +417,8 @@ def main():
         ACTIVE_MODEL_PATH,
         CHALLENGER_MODEL_PATH,
         DEPLOYMENT_STATE_PATH,
-        PRODUCTION_DATA_PATH,
+        COMPARISON_REPORT_PATH,
+        production_data_path,
     ]
 
 
@@ -277,18 +427,14 @@ def main():
         if not path.exists():
 
             raise FileNotFoundError(
-                f"\nRequired file missing:\n{path}"
+                "Required file missing:\n"
+                f"{path}"
             )
 
 
     # =====================================================
     # DEPLOYMENT STATE
     # =====================================================
-
-    state = (
-        load_deployment_state()
-    )
-
 
     print(
         "\nDEPLOYMENT STATE"
@@ -304,7 +450,7 @@ def main():
     )
 
     print(
-        state[
+        deployment_state[
             "champion_version"
         ]
     )
@@ -315,7 +461,7 @@ def main():
     )
 
     print(
-        state[
+        deployment_state[
             "previous_champion_version"
         ]
     )
@@ -326,7 +472,7 @@ def main():
     )
 
     print(
-        state[
+        deployment_state[
             "rollback_available"
         ]
     )
@@ -337,9 +483,49 @@ def main():
     )
 
     print(
-        state[
+        deployment_state[
             "promoted_at"
         ]
+    )
+
+
+    # =====================================================
+    # VERIFY VERSION TRANSITION
+    # =====================================================
+
+    champion_version = str(
+        deployment_state[
+            "champion_version"
+        ]
+    )
+
+
+    previous_version = str(
+        deployment_state[
+            "previous_champion_version"
+        ]
+    )
+
+
+    if (
+        champion_version
+        ==
+        previous_version
+    ):
+
+        raise RuntimeError(
+            "Champion version and previous champion "
+            "version cannot be identical after promotion."
+        )
+
+
+    print(
+        "\nVersion transition:"
+    )
+
+    print(
+        f"V{previous_version} -> "
+        f"V{champion_version}"
     )
 
 
@@ -407,27 +593,33 @@ def main():
     if not artifact_match:
 
         raise RuntimeError(
-            "\nActive production model does not "
+            "Active production model does not "
             "match the promoted challenger."
         )
 
 
     # =====================================================
-    # LOAD PRODUCTION DATA
+    # PRODUCTION DATASET
     # =====================================================
 
     print(
-        "\nLoading production data..."
+        "\nVerification production dataset:"
+    )
+
+    print(
+        production_data_path
     )
 
 
-    production_data = pd.read_csv(
-        PRODUCTION_DATA_PATH
+    production_data = (
+        pd.read_csv(
+            production_data_path
+        )
     )
 
 
     print(
-        "Production rows:"
+        "\nProduction rows:"
     )
 
     print(
@@ -437,15 +629,69 @@ def main():
     )
 
 
-    X = (
-        production_data[
+    # =====================================================
+    # RECREATE UNTOUCHED VALIDATION SET
+    # =====================================================
+
+    validation_strategy = (
+        comparison.get(
+            "validation_strategy",
+            {},
+        )
+    )
+
+
+    validation_fraction = float(
+        validation_strategy.get(
+            "production_validation_fraction",
+            0.30,
+        )
+    )
+
+
+    random_state = int(
+        validation_strategy.get(
+            "random_state",
+            42,
+        )
+    )
+
+
+    _, production_validation = (
+        train_test_split(
+            production_data,
+            test_size=
+                validation_fraction,
+            random_state=
+                random_state,
+            stratify=
+                production_data[
+                    TARGET_COLUMN
+                ],
+        )
+    )
+
+
+    print(
+        "\nUntouched validation rows:"
+    )
+
+    print(
+        len(
+            production_validation
+        )
+    )
+
+
+    X_validation = (
+        production_validation[
             FEATURE_COLUMNS
         ]
     )
 
 
-    y = (
-        production_data[
+    y_validation = (
+        production_validation[
             TARGET_COLUMN
         ]
     )
@@ -456,7 +702,7 @@ def main():
     # =====================================================
 
     print(
-        "\nLoading active production model..."
+        "\nLoading active champion..."
     )
 
 
@@ -468,14 +714,14 @@ def main():
 
 
     # =====================================================
-    # EVALUATE ACTIVE MODEL
+    # EVALUATE ACTIVE CHAMPION
     # =====================================================
 
     active_metrics = (
         calculate_metrics(
             active_model,
-            X,
-            y,
+            X_validation,
+            y_validation,
         )
     )
 
@@ -495,11 +741,69 @@ def main():
 
 
     # =====================================================
-    # OPTIONAL: EVALUATE PREVIOUS CHAMPION
+    # CHECK AGAINST QUALITY-GATE METRICS
+    # =====================================================
+
+    expected_challenger_metrics = (
+        comparison[
+            "challenger_model"
+        ]
+    )
+
+
+    metric_tolerance = 1e-12
+
+
+    for metric_name in [
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+    ]:
+
+        expected_value = float(
+            expected_challenger_metrics[
+                metric_name
+            ]
+        )
+
+
+        actual_value = float(
+            active_metrics[
+                metric_name
+            ]
+        )
+
+
+        if abs(
+            expected_value
+            -
+            actual_value
+        ) > metric_tolerance:
+
+            raise RuntimeError(
+                "Post-promotion validation metric "
+                f"mismatch for {metric_name}. "
+                f"Expected {expected_value}, "
+                f"got {actual_value}."
+            )
+
+
+    print(
+        "\nHeld-out metric verification:"
+    )
+
+    print(
+        "PASSED"
+    )
+
+
+    # =====================================================
+    # EVALUATE PREVIOUS CHAMPION
     # =====================================================
 
     backup_path_value = (
-        state.get(
+        deployment_state.get(
             "previous_model_backup"
         )
     )
@@ -532,8 +836,8 @@ def main():
             previous_metrics = (
                 calculate_metrics(
                     previous_model,
-                    X,
-                    y,
+                    X_validation,
+                    y_validation,
                 )
             )
 
@@ -553,7 +857,7 @@ def main():
 
 
     # =====================================================
-    # COMPARISON
+    # PERFORMANCE CHANGE
     # =====================================================
 
     if previous_metrics:
@@ -639,21 +943,29 @@ def main():
     # SUCCESS
     # =====================================================
 
+    print()
     print(
-        "\n=============================================="
+        "=" * 60
     )
 
     print(
-        " PROMOTION VERIFIED"
+        "PROMOTION VERIFIED"
     )
 
     print(
-        "=============================================="
+        "=" * 60
     )
 
 
     print(
-        "\nActive model artifact matches challenger."
+        "\nActive model artifact matches "
+        "the promoted challenger."
+    )
+
+
+    print(
+        "\nHeld-out performance matches "
+        "the quality-gate result."
     )
 
 
@@ -662,15 +974,27 @@ def main():
     )
 
     print(
-        state[
-            "champion_version"
-        ]
+        champion_version
     )
 
 
     print(
-        "\nThe self-healing deployment "
-        "completed successfully."
+        "\nPrevious champion version:"
+    )
+
+    print(
+        previous_version
+    )
+
+
+    print(
+        "\nRollback available:"
+    )
+
+    print(
+        deployment_state[
+            "rollback_available"
+        ]
     )
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import joblib
@@ -19,11 +21,8 @@ from app.monitoring.drift_detector import (
 )
 
 from app.monitoring.performance_monitor import (
-    prepare_data,
-    calculate_metrics,
-    calculate_performance_drop,
-    determine_model_status,
-    load_baseline_metrics,
+    resolve_production_data_path,
+    run_performance_analysis,
 )
 
 from app.monitoring.root_cause_analyzer import (
@@ -39,16 +38,14 @@ from app.monitoring.anomaly_detector import (
 )
 
 
-# ---------------------------------------------------------
-# 1. PROJECT PATHS
-# ---------------------------------------------------------
+# =========================================================
+# PROJECT PATHS
+# =========================================================
 
 PROJECT_ROOT = (
     Path(__file__)
     .resolve()
-    .parent
-    .parent
-    .parent
+    .parents[2]
 )
 
 
@@ -67,19 +64,13 @@ REFERENCE_DATA_FILE = (
 )
 
 
-PRODUCTION_DATA_FILE = (
-    PROJECT_ROOT
-    / "data"
-    / "production"
-    / "transactions_production.csv"
-)
+# =========================================================
+# DATA QUALITY ANALYSIS
+# =========================================================
 
-
-# ---------------------------------------------------------
-# 2. DATA QUALITY ANALYSIS
-# ---------------------------------------------------------
-
-def run_data_quality_analysis(data):
+def run_data_quality_analysis(
+    data,
+):
 
     missing_columns = (
         check_missing_columns(
@@ -91,13 +82,27 @@ def run_data_quality_analysis(data):
     if missing_columns:
 
         return {
-            "status": "CRITICAL",
-            "score": 0,
-            "missing_columns": missing_columns,
-            "missing_values": {},
-            "duplicates": 0,
-            "numerical_issues": {},
-            "categorical_issues": {},
+
+            "status":
+                "CRITICAL",
+
+            "score":
+                0,
+
+            "missing_columns":
+                missing_columns,
+
+            "missing_values":
+                {},
+
+            "duplicates":
+                0,
+
+            "numerical_issues":
+                {},
+
+            "categorical_issues":
+                {},
         }
 
 
@@ -131,7 +136,9 @@ def run_data_quality_analysis(data):
 
     quality_score = (
         calculate_quality_score(
-            len(data),
+            len(
+                data
+            ),
             missing_values,
             duplicates,
             numerical_issues,
@@ -149,72 +156,33 @@ def run_data_quality_analysis(data):
 
 
     return {
-        "status": status,
-        "score": quality_score,
-        "missing_columns": missing_columns,
-        "missing_values": missing_values,
-        "duplicates": duplicates,
-        "numerical_issues": numerical_issues,
-        "categorical_issues": categorical_issues,
+
+        "status":
+            status,
+
+        "score":
+            quality_score,
+
+        "missing_columns":
+            missing_columns,
+
+        "missing_values":
+            missing_values,
+
+        "duplicates":
+            duplicates,
+
+        "numerical_issues":
+            numerical_issues,
+
+        "categorical_issues":
+            categorical_issues,
     }
 
 
-# ---------------------------------------------------------
-# 3. PERFORMANCE ANALYSIS
-# ---------------------------------------------------------
-
-def run_performance_analysis(
-    model,
-    production_data,
-):
-
-    baseline_metrics = (
-        load_baseline_metrics()
-    )
-
-
-    X_production, y_production = (
-        prepare_data(
-            production_data
-        )
-    )
-
-
-    production_metrics = (
-        calculate_metrics(
-            model,
-            X_production,
-            y_production,
-        )
-    )
-
-
-    performance_drop = (
-        calculate_performance_drop(
-            baseline_metrics,
-            production_metrics,
-        )
-    )
-
-
-    status = (
-        determine_model_status(
-            performance_drop
-        )
-    )
-
-
-    return {
-        "status": status,
-        "reference_metrics": baseline_metrics,
-        "production_metrics": production_metrics,
-        "performance_drop": performance_drop,
-    }
-
-
-# ---------------------------------------------------------
-# 4. ANOMALY DETECTION ANALYSIS
-# ---------------------------------------------------------
+# =========================================================
+# ANOMALY DETECTION ANALYSIS
+# =========================================================
 
 def run_anomaly_analysis(
     reference_data,
@@ -247,9 +215,9 @@ def run_anomaly_analysis(
     return anomaly_report
 
 
-# ---------------------------------------------------------
-# 5. OVERALL SYSTEM STATUS
-# ---------------------------------------------------------
+# =========================================================
+# OVERALL SYSTEM STATUS
+# =========================================================
 
 def determine_overall_status(
     quality_status,
@@ -259,9 +227,13 @@ def determine_overall_status(
 ):
 
     statuses = [
+
         quality_status,
+
         drift_status,
+
         performance_status,
+
         anomaly_status,
     ]
 
@@ -279,9 +251,9 @@ def determine_overall_status(
     return "HEALTHY"
 
 
-# ---------------------------------------------------------
-# 6. GENERATE COMPLETE RELIABILITY REPORT
-# ---------------------------------------------------------
+# =========================================================
+# GENERATE COMPLETE RELIABILITY REPORT
+# =========================================================
 
 def generate_reliability_report():
 
@@ -290,18 +262,45 @@ def generate_reliability_report():
     )
 
 
-    model = joblib.load(
-        MODEL_FILE
+    # -----------------------------------------------------
+    # ACTIVE CHAMPION MODEL
+    # -----------------------------------------------------
+
+    model = (
+        joblib.load(
+            MODEL_FILE
+        )
     )
 
 
-    reference_data = pd.read_csv(
-        REFERENCE_DATA_FILE
+    # -----------------------------------------------------
+    # REFERENCE DATA
+    # -----------------------------------------------------
+
+    reference_data = (
+        pd.read_csv(
+            REFERENCE_DATA_FILE
+        )
     )
 
 
-    production_data = pd.read_csv(
-        PRODUCTION_DATA_FILE
+    # -----------------------------------------------------
+    # CURRENT PRODUCTION DATA
+    #
+    # Uses:
+    #   1. HEALING_PRODUCTION_DATA when provided
+    #   2. default production dataset otherwise
+    # -----------------------------------------------------
+
+    production_data_path = (
+        resolve_production_data_path()
+    )
+
+
+    production_data = (
+        pd.read_csv(
+            production_data_path
+        )
     )
 
 
@@ -310,9 +309,33 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    print(
+        "\nProduction dataset:"
+    )
+
+
+    print(
+        production_data_path
+    )
+
+
+    print(
+        "\nProduction rows:"
+    )
+
+
+    print(
+        len(
+            production_data
+        )
+    )
+
+
+    # =====================================================
     # DATA QUALITY
-    # -----------------------------------------------------
+    #
+    # Evaluate the COMPLETE incoming production batch.
+    # =====================================================
 
     quality_report = (
         run_data_quality_analysis(
@@ -321,9 +344,12 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # DATA DRIFT
-    # -----------------------------------------------------
+    #
+    # Drift is a property of the incoming production
+    # distribution, therefore evaluate the COMPLETE batch.
+    # =====================================================
 
     drift_report = (
         generate_drift_report(
@@ -340,21 +366,32 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # MODEL PERFORMANCE
-    # -----------------------------------------------------
+    #
+    # The corrected performance monitor decides whether:
+    #
+    # - full production should be evaluated, OR
+    # - the original held-out promotion validation split
+    #   must be recreated.
+    #
+    # For V3 + Batch 2 this recreates the untouched 30%.
+    # =====================================================
 
     performance_report = (
         run_performance_analysis(
             model,
             production_data,
+            production_data_path,
         )
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # ANOMALY DETECTION
-    # -----------------------------------------------------
+    #
+    # Evaluate the COMPLETE incoming production batch.
+    # =====================================================
 
     anomaly_report = (
         run_anomaly_analysis(
@@ -364,9 +401,9 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # FEATURE IMPORTANCE
-    # -----------------------------------------------------
+    # =====================================================
 
     importance_report = (
         get_feature_importance(
@@ -375,9 +412,12 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # ROOT CAUSE ANALYSIS
-    # -----------------------------------------------------
+    #
+    # Uses production drift + current active champion
+    # feature importance.
+    # =====================================================
 
     root_cause_report = (
         generate_root_cause_report(
@@ -387,9 +427,9 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # RECOMMENDATION
-    # -----------------------------------------------------
+    # =====================================================
 
     recommendation = (
         generate_recommendation(
@@ -398,19 +438,23 @@ def generate_reliability_report():
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # OVERALL STATUS
-    # -----------------------------------------------------
+    # =====================================================
 
     overall_status = (
         determine_overall_status(
+
             quality_report[
                 "status"
             ],
+
             drift_status,
+
             performance_report[
                 "status"
             ],
+
             anomaly_report[
                 "status"
             ],
@@ -418,14 +462,48 @@ def generate_reliability_report():
     )
 
 
+    # =====================================================
+    # COMPLETE REPORT
+    # =====================================================
+
     return {
+
         "overall_status":
             overall_status,
+
+
+        "monitoring_context": {
+
+            "production_data_path":
+                str(
+                    production_data_path
+                ),
+
+            "production_rows":
+                int(
+                    len(
+                        production_data
+                    )
+                ),
+
+            "active_model_path":
+                str(
+                    MODEL_FILE
+                ),
+
+            "reference_data_path":
+                str(
+                    REFERENCE_DATA_FILE
+                ),
+        },
+
 
         "data_quality":
             quality_report,
 
+
         "data_drift": {
+
             "status":
                 drift_status,
 
@@ -433,41 +511,70 @@ def generate_reliability_report():
                 drift_report,
         },
 
+
         "model_performance":
             performance_report,
+
 
         "anomaly_detection":
             anomaly_report,
 
+
         "root_cause":
             root_cause_report,
+
 
         "recommendation":
             recommendation,
     }
 
 
-# ---------------------------------------------------------
-# 7. PRINT COMPLETE REPORT
-# ---------------------------------------------------------
+# =========================================================
+# PRINT COMPLETE REPORT
+# =========================================================
 
 def print_reliability_report(
     report,
 ):
 
-    print("\n")
-    print("=" * 80)
+    print()
+    print(
+        "=" * 80
+    )
 
     print(
         "ENTERPRISE AI RELIABILITY REPORT"
     )
 
-    print("=" * 80)
+    print(
+        "=" * 80
+    )
 
 
-    # -----------------------------------------------------
+    # =====================================================
+    # MONITORING CONTEXT
+    # =====================================================
+
+    print(
+        "\nMONITORING CONTEXT"
+    )
+
+
+    print(
+        f"Production dataset : "
+        f"{report['monitoring_context']['production_data_path']}"
+    )
+
+
+    print(
+        f"Production rows    : "
+        f"{report['monitoring_context']['production_rows']}"
+    )
+
+
+    # =====================================================
     # OVERALL STATUS
-    # -----------------------------------------------------
+    # =====================================================
 
     print(
         f"\nOVERALL STATUS: "
@@ -475,9 +582,9 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # SYSTEM HEALTH
-    # -----------------------------------------------------
+    # =====================================================
 
     print(
         "\nSYSTEM HEALTH"
@@ -508,18 +615,22 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # DATA QUALITY
-    # -----------------------------------------------------
+    # =====================================================
 
-    print("\n")
-    print("-" * 80)
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "DATA QUALITY"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     print(
@@ -534,24 +645,32 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # DRIFT
-    # -----------------------------------------------------
+    # =====================================================
 
-    print("\n")
-    print("-" * 80)
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "DATA DRIFT"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     drift_columns = [
+
         "feature",
+
         "feature_type",
+
         "drift_level",
+
         "score",
     ]
 
@@ -569,18 +688,22 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
-    # PERFORMANCE
-    # -----------------------------------------------------
+    # =====================================================
+    # MODEL PERFORMANCE
+    # =====================================================
 
-    print("\n")
-    print("-" * 80)
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "MODEL PERFORMANCE"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     baseline_metrics = (
@@ -601,8 +724,17 @@ def print_reliability_report(
     )
 
 
+    performance_metadata = (
+        report[
+            "model_performance"
+        ][
+            "evaluation_metadata"
+        ]
+    )
+
+
     print(
-        "\nBaseline:"
+        "\nActive champion baseline:"
     )
 
 
@@ -611,15 +743,18 @@ def print_reliability_report(
         f"{baseline_metrics['accuracy']:.4f}"
     )
 
+
     print(
         f"Precision: "
         f"{baseline_metrics['precision']:.4f}"
     )
 
+
     print(
         f"Recall   : "
         f"{baseline_metrics['recall']:.4f}"
     )
+
 
     print(
         f"F1 Score : "
@@ -628,7 +763,7 @@ def print_reliability_report(
 
 
     print(
-        "\nProduction:"
+        "\nCurrent performance:"
     )
 
 
@@ -637,15 +772,18 @@ def print_reliability_report(
         f"{production_metrics['accuracy']:.4f}"
     )
 
+
     print(
         f"Precision: "
         f"{production_metrics['precision']:.4f}"
     )
 
+
     print(
         f"Recall   : "
         f"{production_metrics['recall']:.4f}"
     )
+
 
     print(
         f"F1 Score : "
@@ -653,18 +791,46 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
-    # ANOMALY DETECTION
-    # -----------------------------------------------------
+    print(
+        "\nEvaluation mode:"
+    )
 
-    print("\n")
-    print("-" * 80)
+
+    print(
+        performance_metadata[
+            "evaluation_mode"
+        ]
+    )
+
+
+    print(
+        "\nEvaluated rows:"
+    )
+
+
+    print(
+        performance_metadata[
+            "evaluated_rows"
+        ]
+    )
+
+
+    # =====================================================
+    # ANOMALY DETECTION
+    # =====================================================
+
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "ANOMALY DETECTION"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     anomaly_report = (
@@ -679,15 +845,18 @@ def print_reliability_report(
         f"{anomaly_report['status']}"
     )
 
+
     print(
         f"Transactions        : "
         f"{anomaly_report['total_transactions']}"
     )
 
+
     print(
         f"Anomalies           : "
         f"{anomaly_report['anomaly_count']}"
     )
+
 
     print(
         f"Anomaly Percentage  : "
@@ -695,25 +864,31 @@ def print_reliability_report(
     )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # ROOT CAUSE
-    # -----------------------------------------------------
+    # =====================================================
 
-    print("\n")
-    print("-" * 80)
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "TOP ROOT CAUSES"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     top_causes = (
         report[
             "root_cause"
         ]
-        .head(5)
+        .head(
+            5
+        )
     )
 
 
@@ -722,26 +897,33 @@ def print_reliability_report(
     ):
 
         print(
+
             f"{row['feature']:<35} "
+
             f"Drift="
             f"{row['drift_level']:<10} "
+
             f"Priority="
             f"{row['root_cause_priority']}"
         )
 
 
-    # -----------------------------------------------------
+    # =====================================================
     # RECOMMENDATION
-    # -----------------------------------------------------
+    # =====================================================
 
-    print("\n")
-    print("-" * 80)
+    print()
+    print(
+        "-" * 80
+    )
 
     print(
         "RECOMMENDATION"
     )
 
-    print("-" * 80)
+    print(
+        "-" * 80
+    )
 
 
     print(
@@ -751,13 +933,15 @@ def print_reliability_report(
     )
 
 
-    print("\n")
-    print("=" * 80)
+    print()
+    print(
+        "=" * 80
+    )
 
 
-# ---------------------------------------------------------
-# 8. MAIN
-# ---------------------------------------------------------
+# =========================================================
+# MAIN
+# =========================================================
 
 def main():
 

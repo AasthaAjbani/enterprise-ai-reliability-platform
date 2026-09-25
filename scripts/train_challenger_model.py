@@ -1,5 +1,8 @@
-from pathlib import Path
+from __future__ import annotations
+
 import json
+import os
+from pathlib import Path
 
 import joblib
 import pandas as pd
@@ -22,7 +25,12 @@ from sklearn.preprocessing import OneHotEncoder
 # PROJECT PATHS
 # =========================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parents[1]
+)
+
 
 REFERENCE_DATA_PATH = (
     PROJECT_ROOT
@@ -31,12 +39,14 @@ REFERENCE_DATA_PATH = (
     / "transactions_reference.csv"
 )
 
-PRODUCTION_DATA_PATH = (
+
+DEFAULT_PRODUCTION_DATA_PATH = (
     PROJECT_ROOT
     / "data"
     / "production"
     / "transactions_production.csv"
 )
+
 
 CURRENT_MODEL_PATH = (
     PROJECT_ROOT
@@ -44,17 +54,63 @@ CURRENT_MODEL_PATH = (
     / "fraud_model.joblib"
 )
 
+
 CHALLENGER_MODEL_PATH = (
     PROJECT_ROOT
     / "models"
     / "challenger_fraud_model.joblib"
 )
 
+
 COMPARISON_REPORT_PATH = (
     PROJECT_ROOT
     / "models"
     / "challenger_comparison.json"
 )
+
+
+# =========================================================
+# RESOLVE PRODUCTION DATASET
+# =========================================================
+
+def resolve_production_data_path() -> Path:
+
+    """
+    Resolve the production dataset used for self-healing.
+
+    Priority:
+
+    1. HEALING_PRODUCTION_DATA environment variable
+    2. Default transactions_production.csv
+    """
+
+    environment_path = os.getenv(
+        "HEALING_PRODUCTION_DATA"
+    )
+
+
+    if environment_path:
+
+        path = Path(
+            environment_path
+        )
+
+
+        if not path.is_absolute():
+
+            path = (
+                PROJECT_ROOT
+                / path
+            )
+
+
+        return path.resolve()
+
+
+    return (
+        DEFAULT_PRODUCTION_DATA_PATH
+        .resolve()
+    )
 
 
 # =========================================================
@@ -86,7 +142,8 @@ NUMERICAL_FEATURES = [
 
 FEATURE_COLUMNS = (
     CATEGORICAL_FEATURES
-    + NUMERICAL_FEATURES
+    +
+    NUMERICAL_FEATURES
 )
 
 
@@ -107,27 +164,87 @@ MAX_PRECISION_DROP = 0.02
 
 def load_data():
 
-    print("\nLoading datasets...")
+    print(
+        "\nLoading datasets..."
+    )
+
+
+    production_data_path = (
+        resolve_production_data_path()
+    )
+
+
+    # -----------------------------------------------------
+    # Validate files
+    # -----------------------------------------------------
+
+    if not REFERENCE_DATA_PATH.exists():
+
+        raise FileNotFoundError(
+            "Reference dataset not found:\n"
+            f"{REFERENCE_DATA_PATH}"
+        )
+
+
+    if not production_data_path.exists():
+
+        raise FileNotFoundError(
+            "Production dataset not found:\n"
+            f"{production_data_path}"
+        )
+
+
+    if not CURRENT_MODEL_PATH.exists():
+
+        raise FileNotFoundError(
+            "Current production model not found:\n"
+            f"{CURRENT_MODEL_PATH}"
+        )
+
+
+    # -----------------------------------------------------
+    # Load
+    # -----------------------------------------------------
 
     reference_data = pd.read_csv(
         REFERENCE_DATA_PATH
     )
 
+
     production_data = pd.read_csv(
-        PRODUCTION_DATA_PATH
+        production_data_path
+    )
+
+
+    # -----------------------------------------------------
+    # Information
+    # -----------------------------------------------------
+
+    print(
+        "\nProduction dataset:"
     )
 
     print(
-        f"Reference rows: {len(reference_data)}"
+        production_data_path
     )
 
+
     print(
-        f"Production rows: {len(production_data)}"
+        f"\nReference rows: "
+        f"{len(reference_data)}"
     )
+
+
+    print(
+        f"Production rows: "
+        f"{len(production_data)}"
+    )
+
 
     return (
         reference_data,
         production_data,
+        production_data_path,
     )
 
 
@@ -142,7 +259,8 @@ def validate_data(
 
     required_columns = (
         FEATURE_COLUMNS
-        + [
+        +
+        [
             TARGET_COLUMN,
             ID_COLUMN,
         ]
@@ -150,20 +268,26 @@ def validate_data(
 
 
     for dataset_name, dataset in [
+
         (
             "reference",
             reference_data,
         ),
+
         (
             "production",
             production_data,
         ),
+
     ]:
 
         missing_columns = [
+
             column
+
             for column
             in required_columns
+
             if column
             not in dataset.columns
         ]
@@ -173,15 +297,21 @@ def validate_data(
 
             raise ValueError(
                 f"{dataset_name} dataset "
-                f"is missing columns: "
+                f"is missing required columns: "
                 f"{missing_columns}"
             )
 
 
+    # -----------------------------------------------------
+    # Validate production labels
+    # -----------------------------------------------------
+
     production_labels = set(
         production_data[
             TARGET_COLUMN
-        ].dropna().unique()
+        ]
+        .dropna()
+        .unique()
     )
 
 
@@ -190,8 +320,18 @@ def validate_data(
     ):
 
         raise ValueError(
-            "Production labels must "
-            "contain only 0 and 1."
+            "Production labels must contain "
+            "only 0 and 1."
+        )
+
+
+    if len(
+        production_labels
+    ) < 2:
+
+        raise ValueError(
+            "Production dataset must contain "
+            "both fraud and non-fraud examples."
         )
 
 
@@ -205,39 +345,18 @@ def prepare_training_data(
 ):
 
     # -----------------------------------------------------
-    # Recreate the SAME reference split used when the
-    # original deployed model was trained.
+    # Historical training data
     #
-    # Current deployed model was trained on reference_train.
+    # Recreate the same 80% reference split used by
+    # the original model-training process.
     # -----------------------------------------------------
 
-    reference_train, _ = train_test_split(
-        reference_data,
-        test_size=0.20,
-        random_state=42,
-        stratify=reference_data[
-            TARGET_COLUMN
-        ],
-    )
-
-
-    # -----------------------------------------------------
-    # Split CURRENT production labels.
-    #
-    # 70%:
-    # Used to teach the challenger about recent behavior.
-    #
-    # 30%:
-    # Completely untouched validation set.
-    # BOTH models are evaluated on this same dataset.
-    # -----------------------------------------------------
-
-    production_train, production_validation = (
+    reference_train, _ = (
         train_test_split(
-            production_data,
-            test_size=0.30,
+            reference_data,
+            test_size=0.20,
             random_state=42,
-            stratify=production_data[
+            stratify=reference_data[
                 TARGET_COLUMN
             ],
         )
@@ -245,15 +364,44 @@ def prepare_training_data(
 
 
     # -----------------------------------------------------
-    # Combine historical + recent labeled training data.
+    # NEW PRODUCTION BATCH
+    #
+    # 70% = challenger training
+    # 30% = completely untouched validation
+    #
+    # Current champion and challenger will BOTH be tested
+    # on exactly the same 30%.
     # -----------------------------------------------------
 
-    challenger_training_data = pd.concat(
-        [
-            reference_train,
-            production_train,
+    (
+        production_train,
+        production_validation,
+    ) = train_test_split(
+
+        production_data,
+
+        test_size=0.30,
+
+        random_state=42,
+
+        stratify=production_data[
+            TARGET_COLUMN
         ],
-        ignore_index=True,
+    )
+
+
+    # -----------------------------------------------------
+    # Challenger training data
+    # -----------------------------------------------------
+
+    challenger_training_data = (
+        pd.concat(
+            [
+                reference_train,
+                production_train,
+            ],
+            ignore_index=True,
+        )
     )
 
 
@@ -263,6 +411,7 @@ def prepare_training_data(
         ]
     )
 
+
     y_train = (
         challenger_training_data[
             TARGET_COLUMN
@@ -270,11 +419,16 @@ def prepare_training_data(
     )
 
 
+    # -----------------------------------------------------
+    # Untouched validation data
+    # -----------------------------------------------------
+
     X_validation = (
         production_validation[
             FEATURE_COLUMNS
         ]
     )
+
 
     y_validation = (
         production_validation[
@@ -283,28 +437,48 @@ def prepare_training_data(
     )
 
 
+    # -----------------------------------------------------
+    # Information
+    # -----------------------------------------------------
+
     print(
         "\nTraining / validation split"
     )
 
     print(
-        "Historical training rows:",
-        len(reference_train),
+        "---------------------------"
     )
+
+
+    print(
+        "Historical training rows:",
+        len(
+            reference_train
+        ),
+    )
+
 
     print(
         "Recent production training rows:",
-        len(production_train),
+        len(
+            production_train
+        ),
     )
+
 
     print(
         "Total challenger training rows:",
-        len(challenger_training_data),
+        len(
+            challenger_training_data
+        ),
     )
 
+
     print(
-        "Production validation rows:",
-        len(production_validation),
+        "Untouched production validation rows:",
+        len(
+            production_validation
+        ),
     )
 
 
@@ -322,45 +496,57 @@ def prepare_training_data(
 
 def build_challenger():
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            (
-                "categorical",
-                OneHotEncoder(
-                    handle_unknown="ignore"
+    preprocessor = (
+        ColumnTransformer(
+            transformers=[
+                (
+                    "categorical",
+
+                    OneHotEncoder(
+                        handle_unknown="ignore"
+                    ),
+
+                    CATEGORICAL_FEATURES,
                 ),
-                CATEGORICAL_FEATURES,
-            ),
-            (
-                "numerical",
-                "passthrough",
-                NUMERICAL_FEATURES,
-            ),
-        ]
+
+                (
+                    "numerical",
+
+                    "passthrough",
+
+                    NUMERICAL_FEATURES,
+                ),
+            ]
+        )
     )
 
 
-    classifier = RandomForestClassifier(
-        n_estimators=300,
-        max_depth=None,
-        min_samples_leaf=2,
-        class_weight="balanced",
-        random_state=42,
-        n_jobs=-1,
+    classifier = (
+        RandomForestClassifier(
+            n_estimators=300,
+            max_depth=None,
+            min_samples_leaf=2,
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1,
+        )
     )
 
 
-    challenger = Pipeline(
-        steps=[
-            (
-                "preprocessor",
-                preprocessor,
-            ),
-            (
-                "classifier",
-                classifier,
-            ),
-        ]
+    challenger = (
+        Pipeline(
+            steps=[
+                (
+                    "preprocessor",
+                    preprocessor,
+                ),
+
+                (
+                    "classifier",
+                    classifier,
+                ),
+            ]
+        )
     )
 
 
@@ -368,7 +554,7 @@ def build_challenger():
 
 
 # =========================================================
-# EVALUATION
+# CALCULATE METRICS
 # =========================================================
 
 def calculate_metrics(
@@ -377,42 +563,49 @@ def calculate_metrics(
     y,
 ):
 
-    predictions = model.predict(
-        X
+    predictions = (
+        model.predict(
+            X
+        )
     )
 
 
     return {
-        "accuracy": float(
-            accuracy_score(
-                y,
-                predictions,
-            )
-        ),
 
-        "precision": float(
-            precision_score(
-                y,
-                predictions,
-                zero_division=0,
-            )
-        ),
+        "accuracy":
+            float(
+                accuracy_score(
+                    y,
+                    predictions,
+                )
+            ),
 
-        "recall": float(
-            recall_score(
-                y,
-                predictions,
-                zero_division=0,
-            )
-        ),
+        "precision":
+            float(
+                precision_score(
+                    y,
+                    predictions,
+                    zero_division=0,
+                )
+            ),
 
-        "f1": float(
-            f1_score(
-                y,
-                predictions,
-                zero_division=0,
-            )
-        ),
+        "recall":
+            float(
+                recall_score(
+                    y,
+                    predictions,
+                    zero_division=0,
+                )
+            ),
+
+        "f1":
+            float(
+                f1_score(
+                    y,
+                    predictions,
+                    zero_division=0,
+                )
+            ),
 
         "confusion_matrix":
             confusion_matrix(
@@ -432,28 +625,40 @@ def evaluate_promotion(
 ):
 
     f1_improvement = (
-        challenger_metrics["f1"]
+        challenger_metrics[
+            "f1"
+        ]
         -
-        current_metrics["f1"]
+        current_metrics[
+            "f1"
+        ]
     )
 
 
     recall_improvement = (
-        challenger_metrics["recall"]
+        challenger_metrics[
+            "recall"
+        ]
         -
-        current_metrics["recall"]
+        current_metrics[
+            "recall"
+        ]
     )
 
 
     precision_change = (
-        challenger_metrics["precision"]
+        challenger_metrics[
+            "precision"
+        ]
         -
-        current_metrics["precision"]
+        current_metrics[
+            "precision"
+        ]
     )
 
 
     # -----------------------------------------------------
-    # Promotion rules
+    # Promotion checks
     # -----------------------------------------------------
 
     f1_pass = (
@@ -489,7 +694,9 @@ def evaluate_promotion(
     return {
 
         "promotion_eligible":
-            promotion_eligible,
+            bool(
+                promotion_eligible
+            ),
 
         "f1_improvement":
             float(
@@ -518,13 +725,19 @@ def evaluate_promotion(
                 MAX_PRECISION_DROP,
 
             "f1_pass":
-                f1_pass,
+                bool(
+                    f1_pass
+                ),
 
             "recall_pass":
-                recall_pass,
+                bool(
+                    recall_pass
+                ),
 
             "precision_pass":
-                precision_pass,
+                bool(
+                    precision_pass
+                ),
         },
     }
 
@@ -543,32 +756,40 @@ def print_metrics(
     )
 
     print(
-        "-" * len(title)
+        "-" * len(
+            title
+        )
     )
+
 
     print(
         f"Accuracy : "
         f"{metrics['accuracy']:.4f}"
     )
 
+
     print(
         f"Precision: "
         f"{metrics['precision']:.4f}"
     )
+
 
     print(
         f"Recall   : "
         f"{metrics['recall']:.4f}"
     )
 
+
     print(
         f"F1       : "
         f"{metrics['f1']:.4f}"
     )
 
+
     print(
         "Confusion Matrix:"
     )
+
 
     print(
         metrics[
@@ -578,38 +799,171 @@ def print_metrics(
 
 
 # =========================================================
+# SAVE CHALLENGER
+# =========================================================
+
+def save_challenger(
+    challenger_model,
+):
+
+    CHALLENGER_MODEL_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    joblib.dump(
+        challenger_model,
+        CHALLENGER_MODEL_PATH,
+    )
+
+
+    print(
+        "\nChallenger model saved:"
+    )
+
+    print(
+        CHALLENGER_MODEL_PATH
+    )
+
+
+# =========================================================
+# SAVE COMPARISON REPORT
+# =========================================================
+
+def save_comparison_report(
+    decision,
+    current_metrics,
+    challenger_metrics,
+    promotion,
+    production_data_path,
+):
+
+    report = {
+
+        "decision":
+            decision,
+
+
+        "current_model":
+            current_metrics,
+
+
+        "challenger_model":
+            challenger_metrics,
+
+
+        "promotion_analysis":
+            promotion,
+
+
+        "validation_strategy": {
+
+            "production_data_path":
+                str(
+                    production_data_path
+                ),
+
+            "production_validation_fraction":
+                0.30,
+
+            "production_training_fraction":
+                0.70,
+
+            "random_state":
+                42,
+
+            "comparison_note":
+                (
+                    "Current champion and challenger "
+                    "were evaluated on the same untouched "
+                    "production validation set."
+                ),
+        },
+
+
+        "training_strategy": {
+
+            "historical_source":
+                str(
+                    REFERENCE_DATA_PATH
+                ),
+
+            "recent_production_source":
+                str(
+                    production_data_path
+                ),
+
+            "challenger_training_note":
+                (
+                    "Challenger was trained using the "
+                    "historical reference training split "
+                    "plus 70 percent of the new "
+                    "production batch."
+                ),
+        },
+    }
+
+
+    with COMPARISON_REPORT_PATH.open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+
+        json.dump(
+            report,
+            file,
+            indent=4,
+        )
+
+
+    print(
+        "\nComparison report saved:"
+    )
+
+    print(
+        COMPARISON_REPORT_PATH
+    )
+
+
+# =========================================================
 # MAIN
 # =========================================================
 
 def main():
 
+    print()
     print(
-        "\n"
-        "=============================================="
+        "=" * 60
     )
 
     print(
-        " ENTERPRISE AI RELIABILITY PLATFORM"
+        "ENTERPRISE AI RELIABILITY PLATFORM"
     )
 
     print(
-        " CHALLENGER MODEL TRAINING"
+        "CHALLENGER MODEL TRAINING"
     )
 
     print(
-        "=============================================="
+        "=" * 60
     )
 
 
     # -----------------------------------------------------
-    # Load
+    # Load data
     # -----------------------------------------------------
 
     (
         reference_data,
         production_data,
+        production_data_path,
     ) = load_data()
 
+
+    # -----------------------------------------------------
+    # Validate
+    # -----------------------------------------------------
 
     validate_data(
         reference_data,
@@ -618,7 +972,7 @@ def main():
 
 
     # -----------------------------------------------------
-    # Prepare train + untouched production validation
+    # Prepare train + untouched validation
     # -----------------------------------------------------
 
     (
@@ -633,15 +987,18 @@ def main():
 
 
     # -----------------------------------------------------
-    # Load current deployed model
+    # Load current champion
     # -----------------------------------------------------
 
     print(
         "\nLoading current deployed model..."
     )
 
-    current_model = joblib.load(
-        CURRENT_MODEL_PATH
+
+    current_model = (
+        joblib.load(
+            CURRENT_MODEL_PATH
+        )
     )
 
 
@@ -671,9 +1028,10 @@ def main():
 
 
     # -----------------------------------------------------
-    # FAIR COMPARISON
+    # Fair evaluation
     #
-    # BOTH models use SAME production validation set.
+    # Both models see exactly the same untouched
+    # Batch 2 validation set.
     # -----------------------------------------------------
 
     current_metrics = (
@@ -707,7 +1065,7 @@ def main():
 
 
     # -----------------------------------------------------
-    # Promotion decision
+    # Promotion quality gate
     # -----------------------------------------------------
 
     promotion = (
@@ -726,36 +1084,43 @@ def main():
         "------------------"
     )
 
-    print(
-        f"F1 improvement: "
-        f"{promotion['f1_improvement']:.4f}"
-    )
 
     print(
-        f"Recall improvement: "
-        f"{promotion['recall_improvement']:.4f}"
-    )
-
-    print(
-        f"Precision change: "
-        f"{promotion['precision_change']:.4f}"
+        f"F1 improvement     : "
+        f"{promotion['f1_improvement']:+.4f}"
     )
 
 
-    if (
-        promotion[
-            "promotion_eligible"
-        ]
-    ):
+    print(
+        f"Recall improvement : "
+        f"{promotion['recall_improvement']:+.4f}"
+    )
+
+
+    print(
+        f"Precision change   : "
+        f"{promotion['precision_change']:+.4f}"
+    )
+
+
+    # -----------------------------------------------------
+    # Decision
+    # -----------------------------------------------------
+
+    if promotion[
+        "promotion_eligible"
+    ]:
 
         decision = (
             "CHALLENGER_ELIGIBLE_FOR_PROMOTION"
         )
 
+        print()
         print(
-            "\n✅ Challenger passed "
+            "RESULT: Challenger passed "
             "promotion criteria."
         )
+
 
     else:
 
@@ -763,103 +1128,62 @@ def main():
             "KEEP_CURRENT_MODEL"
         )
 
+        print()
         print(
-            "\n❌ Challenger did not pass "
-            "all promotion criteria."
+            "RESULT: Challenger failed "
+            "promotion criteria."
         )
 
 
     # -----------------------------------------------------
-    # SAVE CHALLENGER
+    # Save challenger regardless of decision
     #
-    # IMPORTANT:
-    # We DO NOT overwrite fraud_model.joblib.
+    # Promotion script will decide whether it becomes
+    # the active model.
     # -----------------------------------------------------
 
-    joblib.dump(
-        challenger_model,
-        CHALLENGER_MODEL_PATH,
-    )
-
-
-    print(
-        "\nSaved challenger model:"
-    )
-
-    print(
-        CHALLENGER_MODEL_PATH
+    save_challenger(
+        challenger_model
     )
 
 
     # -----------------------------------------------------
-    # SAVE COMPARISON REPORT
+    # Save comparison report
     # -----------------------------------------------------
 
-    report = {
-
-        "decision":
-            decision,
-
-        "current_model":
-            current_metrics,
-
-        "challenger_model":
-            challenger_metrics,
-
-        "promotion_analysis":
-            promotion,
-
-        "validation_strategy": {
-            "production_validation_fraction":
-                0.30,
-
-            "random_state":
-                42,
-
-            "comparison_note":
-                (
-                    "Current and challenger models "
-                    "were evaluated on the same "
-                    "held-out production validation set."
-                ),
-        },
-    }
-
-
-    with open(
-        COMPARISON_REPORT_PATH,
-        "w",
-        encoding="utf-8",
-    ) as file:
-
-        json.dump(
-            report,
-            file,
-            indent=4,
-        )
-
-
-    print(
-        "\nSaved comparison report:"
-    )
-
-    print(
-        COMPARISON_REPORT_PATH
+    save_comparison_report(
+        decision,
+        current_metrics,
+        challenger_metrics,
+        promotion,
+        production_data_path,
     )
 
 
+    print()
     print(
-        "\n=============================================="
+        "=" * 60
     )
 
     print(
-        f" FINAL DECISION: {decision}"
+        "CHALLENGER TRAINING COMPLETE"
     )
 
     print(
-        "=============================================="
+        "=" * 60
     )
 
+    print(
+        f"\nDecision: "
+        f"{decision}"
+    )
+
+    print()
+
+
+# =========================================================
+# EXECUTE
+# =========================================================
 
 if __name__ == "__main__":
     main()

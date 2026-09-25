@@ -1,44 +1,62 @@
 {
     "pipeline": "enterprise-ai-self-healing",
-    "status": "NO_HEALING_REQUIRED",
+    "status": "SELF_HEALED",
     "current_stage": "FINISHED",
-    "started_at": "2026-09-24T05:25:34.862741+00:00",
-    "updated_at": "2026-09-24T05:25:35.367977+00:00",
-    "completed_at": "2026-09-24T05:25:35.367593+00:00",
+    "started_at": "2026-09-25T06:36:59.222778+00:00",
+    "updated_at": "2026-09-25T06:37:22.097629+00:00",
+    "completed_at": "2026-09-25T06:37:22.097613+00:00",
     "healing_trigger": {
-        "status": "HEALTHY",
-        "healing_required": false,
-        "reason": "Active model performance is within acceptable reliability thresholds.",
+        "status": "CRITICAL",
+        "healing_required": true,
+        "reason": "Critical model performance degradation detected against the active champion baseline.",
         "thresholds": {
             "warning_drop": 0.05,
             "critical_drop": 0.15
         },
+        "baseline_metadata": {
+            "source": "promoted_challenger_validation",
+            "champion_version": "2",
+            "previous_champion_version": "1",
+            "validation_type": "held_out_production_validation",
+            "validation_fraction": 0.3
+        },
         "baseline": {
-            "accuracy": 0.962,
-            "precision": 0.5,
-            "recall": 0.013157894736842105,
-            "f1": 0.02564102564102564
+            "accuracy": 0.8886666666666667,
+            "precision": 0.23478260869565218,
+            "recall": 0.25471698113207547,
+            "f1": 0.24434389140271492
         },
         "production": {
-            "accuracy": 0.9564,
-            "precision": 0.662621359223301,
-            "recall": 0.7755681818181818,
-            "f1": 0.7146596858638743
+            "accuracy": 0.9046,
+            "precision": 0.08695652173913043,
+            "recall": 0.014285714285714285,
+            "f1": 0.024539877300613498
         },
         "degradation": {
-            "f1_drop": -0.6890186602228486,
-            "recall_drop": -0.7624102870813396
+            "accuracy_drop": -0.015933333333333244,
+            "precision_drop": 0.14782608695652175,
+            "recall_drop": 0.24043126684636118,
+            "f1_drop": 0.21980401410210143
+        },
+        "evaluation": {
+            "dataset_path": "D:\\Aastha\\college\\6th sem\\proj\\enterprise-ai-reliability-platform\\data\\production\\transactions_production_batch_2.csv"
         }
     },
-    "healing_required": false,
-    "quality_gate": null,
-    "promotion_attempted": false,
-    "promotion_completed": false,
-    "verification_completed": false,
-    "champion_version": "2",
-    "previous_champion_version": "1",
+    "healing_required": true,
+    "quality_gate": {
+        "eligible": true,
+        "decision": "CHALLENGER_ELIGIBLE_FOR_PROMOTION",
+        "f1_improvement": 0.11056404940830958,
+        "recall_improvement": 0.1111111111111111,
+        "precision_change": 0.05720572057205722
+    },
+    "promotion_attempted": true,
+    "promotion_completed": true,
+    "verification_completed": true,
+    "champion_version": "3",
+    "previous_champion_version": "2",
     "rollback_available": true,
     "failure_stage": null,
     "error": null,
-    "duration_seconds": 0.5
+    "duration_seconds": 22.87
 }

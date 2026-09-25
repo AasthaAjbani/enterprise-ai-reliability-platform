@@ -6,6 +6,10 @@ import {
   useState,
 } from "react";
 
+import type {
+  ReactNode,
+} from "react";
+
 import Link from "next/link";
 
 import {
@@ -13,11 +17,14 @@ import {
   ArrowLeft,
   Database,
   Gauge,
+  LoaderCircle,
   Radar,
   RefreshCw,
   ShieldCheck,
-  TriangleAlert,
 } from "lucide-react";
+
+import SelfHealingStatusPanel
+  from "@/components/dashboard/SelfHealingStatusPanel";
 
 import {
   fetchReliabilityReport,
@@ -29,50 +36,68 @@ import type {
 } from "@/types/reliability";
 
 
+// =========================================================
+// DASHBOARD
+// =========================================================
+
 export default function ReliabilityDashboard() {
 
   const [
     report,
     setReport,
-  ] = useState<ReliabilityReport | null>(
-    null
-  );
+  ] = useState<
+    ReliabilityReport | null
+  >(null);
+
 
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] = useState(
+    true
+  );
+
 
   const [
     error,
     setError,
-  ] = useState<string | null>(
-    null
-  );
+  ] = useState<
+    string | null
+  >(null);
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // LOAD REPORT
-  // -------------------------------------------------------
+  // =======================================================
 
   async function loadReport() {
 
     try {
 
-      setLoading(true);
+      setLoading(
+        true
+      );
 
-      setError(null);
 
       const data =
         await fetchReliabilityReport();
+
 
       setReport(
         data
       );
 
+
+      setError(
+        null
+      );
+
     } catch (err) {
 
-      console.error(err);
+      console.error(
+        err
+      );
+
 
       setError(
         "Unable to load reliability data."
@@ -80,7 +105,9 @@ export default function ReliabilityDashboard() {
 
     } finally {
 
-      setLoading(false);
+      setLoading(
+        false
+      );
 
     }
 
@@ -94,73 +121,118 @@ export default function ReliabilityDashboard() {
   }, []);
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // DERIVED VALUES
-  // -------------------------------------------------------
+  // =======================================================
 
   const driftCounts =
-    useMemo(() => {
+    useMemo(
+      () => {
 
-      if (!report) {
+        if (!report) {
+
+          return {
+            high: 0,
+            moderate: 0,
+            low: 0,
+          };
+
+        }
+
+
+        const features =
+          report
+            .data_drift
+            .features;
+
 
         return {
-          high: 0,
-          moderate: 0,
-          low: 0,
+
+          high:
+            features.filter(
+              (item) =>
+                item.drift_level ===
+                "HIGH"
+            ).length,
+
+          moderate:
+            features.filter(
+              (item) =>
+                item.drift_level ===
+                "MODERATE"
+            ).length,
+
+          low:
+            features.filter(
+              (item) =>
+                item.drift_level ===
+                "LOW"
+            ).length,
         };
 
-      }
-
-
-      const features =
-        report
-          .data_drift
-          .features;
-
-
-      return {
-
-        high:
-          features.filter(
-            (item) =>
-              item.drift_level === "HIGH"
-          ).length,
-
-        moderate:
-          features.filter(
-            (item) =>
-              item.drift_level === "MODERATE"
-          ).length,
-
-        low:
-          features.filter(
-            (item) =>
-              item.drift_level === "LOW"
-          ).length,
-
-      };
-
-    }, [report]);
+      },
+      [report]
+    );
 
 
   const topRootCause =
-    report
-      ?.root_causes
-      ?.slice()
-      .sort(
-        (
-          first,
-          second
-        ) =>
-          second.root_cause_score
-          -
-          first.root_cause_score
-      )[0];
+    useMemo(
+      () => {
+
+        if (
+          !report
+          ||
+          report.root_causes.length === 0
+        ) {
+
+          return null;
+
+        }
 
 
-  // -------------------------------------------------------
+        return (
+          report
+            .root_causes
+            .slice()
+            .sort(
+              (
+                first,
+                second
+              ) =>
+                second.root_cause_score
+                -
+                first.root_cause_score
+            )[0]
+        );
+
+      },
+      [report]
+    );
+
+
+  const rootCauseStatus:
+    ReliabilityStatus =
+      topRootCause
+        ?.root_cause_priority
+        ===
+        "LOW"
+        ?
+        "HEALTHY"
+        :
+        "WARNING";
+
+
+  const rootCauseBadge =
+    topRootCause
+      ?
+      `${topRootCause.root_cause_priority} PRIORITY`
+      :
+      "NO PRIORITY";
+
+
+  // =======================================================
   // LOADING
-  // -------------------------------------------------------
+  // =======================================================
 
   if (loading) {
 
@@ -171,7 +243,7 @@ export default function ReliabilityDashboard() {
           min-h-screen
           items-center
           justify-center
-          bg-[#070707]
+          bg-[#080808]
           text-white
         "
       >
@@ -180,14 +252,14 @@ export default function ReliabilityDashboard() {
           className="
             flex
             items-center
-            gap-4
-            text-sm
+            gap-3
+            text-xs
             tracking-[0.18em]
             text-white/45
           "
         >
 
-          <RefreshCw
+          <LoaderCircle
             className="
               h-4
               w-4
@@ -201,13 +273,12 @@ export default function ReliabilityDashboard() {
 
       </main>
     );
-
   }
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // ERROR
-  // -------------------------------------------------------
+  // =======================================================
 
   if (
     error
@@ -222,7 +293,7 @@ export default function ReliabilityDashboard() {
           min-h-screen
           items-center
           justify-center
-          bg-[#070707]
+          bg-[#080808]
           px-6
           text-white
         "
@@ -230,20 +301,10 @@ export default function ReliabilityDashboard() {
 
         <div
           className="
-            max-w-xl
+            max-w-lg
             text-center
           "
         >
-
-          <TriangleAlert
-            className="
-              mx-auto
-              mb-6
-              h-10
-              w-10
-              text-white/40
-            "
-          />
 
           <h1
             className="
@@ -255,6 +316,7 @@ export default function ReliabilityDashboard() {
             Reliability data unavailable
 
           </h1>
+
 
           <p
             className="
@@ -268,21 +330,27 @@ export default function ReliabilityDashboard() {
 
           </p>
 
+
           <button
-            onClick={loadReport}
+            type="button"
+            onClick={
+              loadReport
+            }
             className="
               mt-8
               rounded-full
-              bg-white
+              border
+              border-white/20
               px-6
               py-3
               text-sm
-              font-medium
-              text-black
+              transition
+              hover:bg-white
+              hover:text-black
             "
           >
 
-            Try again
+            Retry
 
           </button>
 
@@ -290,24 +358,25 @@ export default function ReliabilityDashboard() {
 
       </main>
     );
-
   }
 
 
-  // -------------------------------------------------------
+  // =======================================================
   // DASHBOARD
-  // -------------------------------------------------------
+  // =======================================================
 
   return (
     <main
       className="
         min-h-screen
-        bg-[#070707]
+        bg-[#080808]
         text-white
       "
     >
 
+      {/* ================================================= */}
       {/* HEADER */}
+      {/* ================================================= */}
 
       <header
         className="
@@ -348,6 +417,7 @@ export default function ReliabilityDashboard() {
                 rounded-full
                 border
                 border-white/15
+                text-white/60
                 transition
                 hover:bg-white
                 hover:text-black
@@ -375,11 +445,11 @@ export default function ReliabilityDashboard() {
 
               </p>
 
+
               <h1
                 className="
                   mt-1
                   text-xl
-                  font-medium
                 "
               >
 
@@ -408,7 +478,10 @@ export default function ReliabilityDashboard() {
 
 
             <button
-              onClick={loadReport}
+              type="button"
+              onClick={
+                loadReport
+              }
               className="
                 flex
                 h-10
@@ -420,8 +493,10 @@ export default function ReliabilityDashboard() {
                 border-white/15
                 text-white/60
                 transition
+                hover:border-white/30
                 hover:text-white
               "
+              aria-label="Refresh dashboard"
             >
 
               <RefreshCw
@@ -437,6 +512,10 @@ export default function ReliabilityDashboard() {
       </header>
 
 
+      {/* ================================================= */}
+      {/* CONTENT */}
+      {/* ================================================= */}
+
       <div
         className="
           mx-auto
@@ -447,7 +526,9 @@ export default function ReliabilityDashboard() {
         "
       >
 
+        {/* ================================================= */}
         {/* HERO STATUS */}
+        {/* ================================================= */}
 
         <section
           className="
@@ -458,7 +539,7 @@ export default function ReliabilityDashboard() {
           <p
             className="
               mb-4
-              text-xs
+              text-[10px]
               uppercase
               tracking-[0.35em]
               text-white/35
@@ -472,7 +553,6 @@ export default function ReliabilityDashboard() {
 
           <h2
             className="
-              max-w-5xl
               text-5xl
               font-semibold
               uppercase
@@ -483,7 +563,7 @@ export default function ReliabilityDashboard() {
             "
           >
 
-            Your model is{" "}
+            System reliability is{" "}
 
             <span
               className="
@@ -506,7 +586,9 @@ export default function ReliabilityDashboard() {
         </section>
 
 
+        {/* ================================================= */}
         {/* TOP STATUS CARDS */}
+        {/* ================================================= */}
 
         <section
           className="
@@ -526,9 +608,13 @@ export default function ReliabilityDashboard() {
                 .data_drift
                 .status
             }
-            description={`${driftCounts.high} high-risk features`}
+            description={
+              `${driftCounts.high} high-risk features`
+            }
             icon={
-              <Database size={18} />
+              <Database
+                size={18}
+              />
             }
           />
 
@@ -542,14 +628,18 @@ export default function ReliabilityDashboard() {
                 .model_performance
                 .status
             }
-            description={`F1 ${formatPercent(
-              report
-                .model_performance
-                .production
-                .f1
-            )}`}
+            description={
+              `F1 ${formatPercent(
+                report
+                  .model_performance
+                  .production
+                  .f1
+              )}`
+            }
             icon={
-              <Gauge size={18} />
+              <Gauge
+                size={18}
+              />
             }
           />
 
@@ -563,9 +653,13 @@ export default function ReliabilityDashboard() {
                 .anomaly_detection
                 .status
             }
-            description={`${report.anomaly_detection.anomaly_count} detected`}
+            description={
+              `${report.anomaly_detection.anomaly_count} detected`
+            }
             icon={
-              <Radar size={18} />
+              <Radar
+                size={18}
+              />
             }
           />
 
@@ -575,23 +669,30 @@ export default function ReliabilityDashboard() {
             number="04"
             title="Root Cause"
             status={
-              report.overall_status
+              rootCauseStatus
+            }
+            badgeLabel={
+              rootCauseBadge
             }
             description={
               topRootCause
                 ?.feature
-                ??
+              ??
               "No dominant feature"
             }
             icon={
-              <Activity size={18} />
+              <Activity
+                size={18}
+              />
             }
           />
 
         </section>
 
 
-        {/* PERFORMANCE */}
+        {/* ================================================= */}
+        {/* PERFORMANCE + DATA QUALITY */}
+        {/* ================================================= */}
 
         <section
           className="
@@ -601,6 +702,8 @@ export default function ReliabilityDashboard() {
             xl:grid-cols-[1.4fr_0.6fr]
           "
         >
+
+          {/* MODEL PERFORMANCE */}
 
           <div
             className="
@@ -636,6 +739,7 @@ export default function ReliabilityDashboard() {
                   Model Performance
 
                 </p>
+
 
                 <h3
                   className="
@@ -775,6 +879,7 @@ export default function ReliabilityDashboard() {
                 "
               />
 
+
               <p
                 className="
                   text-[10px]
@@ -850,6 +955,7 @@ export default function ReliabilityDashboard() {
 
                 </span>
 
+
                 <span>
 
                   {
@@ -869,7 +975,9 @@ export default function ReliabilityDashboard() {
         </section>
 
 
+        {/* ================================================= */}
         {/* DRIFT + ROOT CAUSE */}
+        {/* ================================================= */}
 
         <section
           className="
@@ -879,6 +987,8 @@ export default function ReliabilityDashboard() {
             lg:grid-cols-2
           "
         >
+
+          {/* DRIFT */}
 
           <div
             className="
@@ -921,12 +1031,14 @@ export default function ReliabilityDashboard() {
                 label="High"
               />
 
+
               <CountBox
                 value={
                   driftCounts.moderate
                 }
                 label="Moderate"
               />
+
 
               <CountBox
                 value={
@@ -957,6 +1069,8 @@ export default function ReliabilityDashboard() {
           </div>
 
 
+          {/* ROOT CAUSE */}
+
           <div
             className="
               rounded-[28px]
@@ -968,18 +1082,41 @@ export default function ReliabilityDashboard() {
             "
           >
 
-            <p
+            <div
               className="
-                text-[10px]
-                uppercase
-                tracking-[0.28em]
-                text-white/30
+                flex
+                items-center
+                justify-between
+                gap-4
               "
             >
 
-              Highest Priority Cause
+              <p
+                className="
+                  text-[10px]
+                  uppercase
+                  tracking-[0.28em]
+                  text-white/30
+                "
+              >
 
-            </p>
+                Highest Priority Cause
+
+              </p>
+
+
+              {topRootCause && (
+
+                <PriorityBadge
+                  priority={
+                    topRootCause
+                      .root_cause_priority
+                  }
+                />
+
+              )}
+
+            </div>
 
 
             <h3
@@ -995,7 +1132,7 @@ export default function ReliabilityDashboard() {
               {
                 topRootCause
                   ?.feature
-                  ??
+                ??
                 "No dominant feature"
               }
 
@@ -1023,6 +1160,7 @@ export default function ReliabilityDashboard() {
                         .toFixed(4)
                     }
                   />
+
 
                   <SmallMetric
                     label="Importance"
@@ -1061,7 +1199,16 @@ export default function ReliabilityDashboard() {
         </section>
 
 
+        {/* ================================================= */}
+        {/* SELF-HEALING */}
+        {/* ================================================= */}
+
+        <SelfHealingStatusPanel />
+
+
+        {/* ================================================= */}
         {/* RECOMMENDATION */}
+        {/* ================================================= */}
 
         <section
           className="
@@ -1117,7 +1264,7 @@ export default function ReliabilityDashboard() {
 
 
 // =========================================================
-// COMPONENTS
+// STATUS CARD
 // =========================================================
 
 function StatusCard({
@@ -1125,6 +1272,7 @@ function StatusCard({
   number,
   title,
   status,
+  badgeLabel,
   description,
   icon,
 }: {
@@ -1132,8 +1280,9 @@ function StatusCard({
   number: string;
   title: string;
   status: ReliabilityStatus;
+  badgeLabel?: string;
   description: string;
-  icon: React.ReactNode;
+  icon: ReactNode;
 }) {
 
   return (
@@ -1222,7 +1371,12 @@ function StatusCard({
       >
 
         <StatusBadge
-          status={status}
+          status={
+            status
+          }
+          label={
+            badgeLabel
+          }
         />
 
       </div>
@@ -1232,18 +1386,26 @@ function StatusCard({
 }
 
 
+// =========================================================
+// STATUS BADGE
+// =========================================================
+
 function StatusBadge({
   status,
+  label,
 }: {
   status: ReliabilityStatus;
+  label?: string;
 }) {
 
   const style =
     status === "CRITICAL"
-      ? "border-red-400/25 bg-red-400/10 text-red-300"
+      ?
+      "border-red-400/25 bg-red-400/10 text-red-300"
       :
       status === "WARNING"
-        ? "border-amber-400/25 bg-amber-400/10 text-amber-300"
+        ?
+        "border-amber-400/25 bg-amber-400/10 text-amber-300"
         :
         "border-emerald-400/25 bg-emerald-400/10 text-emerald-300";
 
@@ -1263,12 +1425,66 @@ function StatusBadge({
       `}
     >
 
-      {status}
+      {
+        label
+        ??
+        status
+      }
 
     </span>
   );
 }
 
+
+// =========================================================
+// ROOT CAUSE PRIORITY BADGE
+// =========================================================
+
+function PriorityBadge({
+  priority,
+}: {
+  priority:
+    | "LOW"
+    | "MEDIUM"
+    | "HIGH";
+}) {
+
+  const style =
+    priority === "HIGH"
+      ?
+      "border-amber-400/25 bg-amber-400/10 text-amber-300"
+      :
+      priority === "MEDIUM"
+        ?
+        "border-yellow-400/20 bg-yellow-400/10 text-yellow-200"
+        :
+        "border-emerald-400/20 bg-emerald-400/10 text-emerald-300";
+
+
+  return (
+    <span
+      className={`
+        rounded-full
+        border
+        px-3
+        py-1.5
+        text-[9px]
+        font-medium
+        tracking-[0.15em]
+        ${style}
+      `}
+    >
+
+      {priority} PRIORITY
+
+    </span>
+  );
+}
+
+
+// =========================================================
+// METRIC COMPARISON
+// =========================================================
 
 function MetricComparison({
   label,
@@ -1319,13 +1535,18 @@ function MetricComparison({
             "
           >
 
-            B {formatPercent(baseline)}
+            B {formatPercent(
+              baseline
+            )}
 
           </span>
 
+
           <span>
 
-            P {formatPercent(production)}
+            P {formatPercent(
+              production
+            )}
 
           </span>
 
@@ -1386,6 +1607,10 @@ function MetricComparison({
 }
 
 
+// =========================================================
+// COUNT BOX
+// =========================================================
+
 function CountBox({
   value,
   label,
@@ -1415,6 +1640,7 @@ function CountBox({
 
       </p>
 
+
       <p
         className="
           mt-2
@@ -1433,6 +1659,10 @@ function CountBox({
   );
 }
 
+
+// =========================================================
+// SMALL METRIC
+// =========================================================
 
 function SmallMetric({
   label,
@@ -1463,6 +1693,7 @@ function SmallMetric({
 
       </p>
 
+
       <p
         className="
           mt-2
@@ -1479,6 +1710,10 @@ function SmallMetric({
   );
 }
 
+
+// =========================================================
+// FORMAT PERCENTAGE
+// =========================================================
 
 function formatPercent(
   value: number

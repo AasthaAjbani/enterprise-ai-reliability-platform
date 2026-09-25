@@ -1,8 +1,11 @@
-from pathlib import Path
-from datetime import datetime, timezone
+from __future__ import annotations
+
 import json
 import os
 import shutil
+
+from datetime import datetime, timezone
+from pathlib import Path
 
 import mlflow
 
@@ -13,32 +16,42 @@ from mlflow.tracking import MlflowClient
 # PROJECT CONFIGURATION
 # =========================================================
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = (
+    Path(__file__)
+    .resolve()
+    .parents[1]
+)
+
 
 MODELS_DIR = (
     PROJECT_ROOT
     / "models"
 )
 
+
 ARCHIVE_DIR = (
     MODELS_DIR
     / "archive"
 )
+
 
 CURRENT_MODEL_PATH = (
     MODELS_DIR
     / "fraud_model.joblib"
 )
 
+
 CHALLENGER_MODEL_PATH = (
     MODELS_DIR
     / "challenger_fraud_model.joblib"
 )
 
+
 COMPARISON_REPORT_PATH = (
     MODELS_DIR
     / "challenger_comparison.json"
 )
+
 
 DEPLOYMENT_STATE_PATH = (
     MODELS_DIR
@@ -51,9 +64,11 @@ MLFLOW_DB_PATH = (
     / "mlflow.db"
 ).resolve()
 
+
 MLFLOW_TRACKING_URI = (
     f"sqlite:///{MLFLOW_DB_PATH.as_posix()}"
 )
+
 
 REGISTERED_MODEL_NAME = (
     "FraudDetectionModel"
@@ -75,7 +90,9 @@ def validate_files():
 
     missing_files = [
         path
+
         for path in required_files
+
         if not path.exists()
     ]
 
@@ -84,8 +101,10 @@ def validate_files():
 
         formatted = "\n".join(
             str(path)
+
             for path in missing_files
         )
+
 
         raise FileNotFoundError(
             "\nRequired files are missing:\n"
@@ -105,7 +124,9 @@ def load_comparison():
         encoding="utf-8",
     ) as file:
 
-        return json.load(file)
+        return json.load(
+            file
+        )
 
 
 # =========================================================
@@ -115,6 +136,7 @@ def load_comparison():
 def load_deployment_state():
 
     if not DEPLOYMENT_STATE_PATH.exists():
+
         return None
 
 
@@ -124,7 +146,9 @@ def load_deployment_state():
         encoding="utf-8",
     ) as file:
 
-        return json.load(file)
+        return json.load(
+            file
+        )
 
 
 # =========================================================
@@ -145,6 +169,7 @@ def get_alias(
                 alias,
             )
         )
+
 
     except Exception:
 
@@ -167,7 +192,8 @@ def backup_current_model(
 
     backup_path = (
         ARCHIVE_DIR
-        / (
+        /
+        (
             f"fraud_model_v"
             f"{champion_version}.joblib"
         )
@@ -183,6 +209,7 @@ def backup_current_model(
         print(
             backup_path
         )
+
 
         return backup_path
 
@@ -218,9 +245,7 @@ def activate_challenger_model():
 
 
     # -----------------------------------------------------
-    # Copy challenger into a temporary file first.
-    #
-    # We do not write directly over the production file.
+    # Copy challenger into temporary file first.
     # -----------------------------------------------------
 
     shutil.copy2(
@@ -230,7 +255,7 @@ def activate_challenger_model():
 
 
     # -----------------------------------------------------
-    # os.replace is atomic on the same filesystem.
+    # Atomic replacement.
     # -----------------------------------------------------
 
     os.replace(
@@ -260,18 +285,134 @@ def set_version_tag(
 ):
 
     client.set_model_version_tag(
+
         name=
             REGISTERED_MODEL_NAME,
 
         version=
-            str(version),
+            str(
+                version
+            ),
 
         key=
             key,
 
         value=
-            str(value),
+            str(
+                value
+            ),
     )
+
+
+# =========================================================
+# BUILD ACCEPTED BASELINE
+# =========================================================
+
+def build_accepted_baseline(
+    comparison,
+):
+
+    challenger_metrics = (
+        comparison.get(
+            "challenger_model",
+            {},
+        )
+    )
+
+
+    validation_strategy = (
+        comparison.get(
+            "validation_strategy",
+            {},
+        )
+    )
+
+
+    required_metrics = [
+        "accuracy",
+        "precision",
+        "recall",
+        "f1",
+    ]
+
+
+    missing_metrics = [
+        metric
+
+        for metric in required_metrics
+
+        if metric not in challenger_metrics
+    ]
+
+
+    if missing_metrics:
+
+        raise ValueError(
+            "Cannot save accepted champion baseline. "
+            "Missing challenger metrics: "
+            f"{missing_metrics}"
+        )
+
+
+    accepted_baseline = {
+
+        "source":
+            "promoted_challenger_validation",
+
+        "validation_type":
+            "held_out_production_validation",
+
+        "validation_fraction":
+            validation_strategy.get(
+                "production_validation_fraction",
+                0.30,
+            ),
+
+        "production_data_path":
+            validation_strategy.get(
+                "production_data_path"
+            ),
+
+        "random_state":
+            validation_strategy.get(
+                "random_state",
+                42,
+            ),
+
+        "metrics": {
+
+            "accuracy":
+                float(
+                    challenger_metrics[
+                        "accuracy"
+                    ]
+                ),
+
+            "precision":
+                float(
+                    challenger_metrics[
+                        "precision"
+                    ]
+                ),
+
+            "recall":
+                float(
+                    challenger_metrics[
+                        "recall"
+                    ]
+                ),
+
+            "f1":
+                float(
+                    challenger_metrics[
+                        "f1"
+                    ]
+                ),
+        },
+    }
+
+
+    return accepted_baseline
 
 
 # =========================================================
@@ -290,48 +431,85 @@ def save_deployment_state(
     )
 
 
+    # -----------------------------------------------------
+    # Permanently save the validation baseline belonging
+    # to the newly promoted champion.
+    #
+    # This prevents future challenger training from
+    # overwriting the active champion baseline.
+    # -----------------------------------------------------
+
+    accepted_baseline = (
+        build_accepted_baseline(
+            comparison
+        )
+    )
+
+
     state = {
 
         "registered_model":
             REGISTERED_MODEL_NAME,
+
 
         "champion_version":
             str(
                 new_champion_version
             ),
 
+
         "previous_champion_version":
             str(
                 old_champion_version
             ),
+
 
         "active_model_path":
             str(
                 CURRENT_MODEL_PATH
             ),
 
+
         "previous_model_backup":
             str(
                 backup_path
             ),
+
 
         "challenger_source_path":
             str(
                 CHALLENGER_MODEL_PATH
             ),
 
+
         "promotion_decision":
             comparison[
                 "decision"
             ],
+
 
         "promoted_at":
             datetime.now(
                 timezone.utc
             ).isoformat(),
 
+
         "rollback_available":
             True,
+
+
+        # -------------------------------------------------
+        # IMPORTANT:
+        # Accepted baseline for CURRENT champion.
+        # -------------------------------------------------
+
+        "accepted_baseline":
+            accepted_baseline,
+
+
+        # -------------------------------------------------
+        # Preserve complete previous deployment history.
+        # -------------------------------------------------
 
         "previous_deployment_state":
             previous_state,
@@ -360,33 +538,62 @@ def save_deployment_state(
     )
 
 
+    print(
+        "\nAccepted champion baseline saved:"
+    )
+
+
+    print(
+        f"Accuracy : "
+        f"{accepted_baseline['metrics']['accuracy']:.4f}"
+    )
+
+
+    print(
+        f"Precision: "
+        f"{accepted_baseline['metrics']['precision']:.4f}"
+    )
+
+
+    print(
+        f"Recall   : "
+        f"{accepted_baseline['metrics']['recall']:.4f}"
+    )
+
+
+    print(
+        f"F1       : "
+        f"{accepted_baseline['metrics']['f1']:.4f}"
+    )
+
+
 # =========================================================
 # MAIN
 # =========================================================
 
 def main():
 
+    print()
     print(
-        "\n"
-        "=============================================="
+        "=" * 60
     )
 
     print(
-        " ENTERPRISE AI RELIABILITY PLATFORM"
+        "ENTERPRISE AI RELIABILITY PLATFORM"
     )
 
     print(
-        " CONTROLLED MODEL PROMOTION"
+        "CONTROLLED MODEL PROMOTION"
     )
 
     print(
-        "=============================================="
+        "=" * 60
     )
 
 
     # =====================================================
     # STEP 1
-    # Validate local artifacts
+    # VALIDATE LOCAL ARTIFACTS
     # =====================================================
 
     print(
@@ -404,7 +611,7 @@ def main():
 
     # =====================================================
     # STEP 2
-    # Read quality-gate decision
+    # READ QUALITY-GATE DECISION
     # =====================================================
 
     comparison = (
@@ -448,23 +655,24 @@ def main():
 
     # =====================================================
     # STEP 3
-    # STOP if gate failed
+    # STOP IF QUALITY GATE FAILED
     # =====================================================
 
     if not promotion[
         "promotion_eligible"
     ]:
 
+        print()
         print(
-            "\n=============================================="
+            "=" * 60
         )
 
         print(
-            " PROMOTION BLOCKED"
+            "PROMOTION BLOCKED"
         )
 
         print(
-            "=============================================="
+            "=" * 60
         )
 
 
@@ -478,12 +686,13 @@ def main():
             "\nProduction model remains unchanged."
         )
 
+
         return
 
 
     # =====================================================
     # STEP 4
-    # Configure MLflow
+    # CONFIGURE MLFLOW
     # =====================================================
 
     mlflow.set_tracking_uri(
@@ -499,7 +708,7 @@ def main():
 
     # =====================================================
     # STEP 5
-    # Get current aliases
+    # GET CURRENT MODEL ALIASES
     # =====================================================
 
     champion = (
@@ -532,17 +741,13 @@ def main():
         )
 
 
-    champion_version = (
-        str(
-            champion.version
-        )
+    champion_version = str(
+        champion.version
     )
 
 
-    challenger_version = (
-        str(
-            challenger.version
-        )
+    challenger_version = str(
+        challenger.version
     )
 
 
@@ -566,7 +771,7 @@ def main():
 
     # =====================================================
     # STEP 6
-    # Prevent duplicate promotion
+    # PREVENT DUPLICATE PROMOTION
     # =====================================================
 
     if (
@@ -583,12 +788,13 @@ def main():
             "No deployment changes required."
         )
 
+
         return
 
 
     # =====================================================
     # STEP 7
-    # Backup current production model
+    # BACKUP CURRENT CHAMPION
     # =====================================================
 
     backup_path = (
@@ -600,7 +806,7 @@ def main():
 
     # =====================================================
     # STEP 8
-    # Activate challenger locally
+    # ACTIVATE CHALLENGER
     # =====================================================
 
     print(
@@ -613,7 +819,7 @@ def main():
 
     # =====================================================
     # STEP 9
-    # Update MLflow aliases
+    # UPDATE MLFLOW ALIASES
     # =====================================================
 
     client.set_registered_model_alias(
@@ -632,6 +838,7 @@ def main():
 
     # Keep challenger alias pointing at the model that
     # originally entered this promotion process.
+
     client.set_registered_model_alias(
         REGISTERED_MODEL_NAME,
         "challenger",
@@ -641,7 +848,7 @@ def main():
 
     # =====================================================
     # STEP 10
-    # Update previous champion metadata
+    # UPDATE PREVIOUS CHAMPION METADATA
     # =====================================================
 
     set_version_tag(
@@ -662,7 +869,7 @@ def main():
 
     # =====================================================
     # STEP 11
-    # Update new champion metadata
+    # UPDATE NEW CHAMPION METADATA
     # =====================================================
 
     set_version_tag(
@@ -693,10 +900,11 @@ def main():
 
     # =====================================================
     # STEP 12
-    # Save deployment state
+    # SAVE DEPLOYMENT STATE
     # =====================================================
 
     save_deployment_state(
+
         old_champion_version=
             champion_version,
 
@@ -715,16 +923,17 @@ def main():
     # FINISHED
     # =====================================================
 
+    print()
     print(
-        "\n=============================================="
+        "=" * 60
     )
 
     print(
-        " PROMOTION SUCCESSFUL"
+        "PROMOTION SUCCESSFUL"
     )
 
     print(
-        "=============================================="
+        "=" * 60
     )
 
 
@@ -750,10 +959,12 @@ def main():
         "\nMLflow aliases:"
     )
 
+
     print(
         "champion -> "
         f"version {challenger_version}"
     )
+
 
     print(
         "previous_champion -> "
